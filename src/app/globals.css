@@ -1,26 +1,234 @@
 @import "tailwindcss";
 
+/* ============================================
+   KHARCHA — "Slate & Parchment" Design System
+   ============================================ */
+
+/* === CSS CUSTOM PROPERTIES === */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* === BACKGROUNDS === */
+  --bg-global:            #E5E2DD;  /* Warm Stone — main app background */
+  --bg-surface:           #F2F0ED;  /* Parchment — cards, containers */
+  --bg-surface-hover:     #EBE8E3;  /* Slightly darker parchment on hover */
+  --bg-navigation:        #D8D4CE;  /* Weathered Clay — nav, sidebar */
+  --bg-navigation-active: #CFC9C1;  /* Active nav item */
+  --bg-overlay:           rgba(42, 45, 52, 0.4); /* Modal backdrop */
+  --bg-input:             #F7F5F2;  /* Slightly lighter for input fields */
+  --bg-skeleton:          #DDD9D3;  /* Skeleton loading base */
+
+  /* === TEXT === */
+  --text-primary:         #2A2D34;  /* Charcoal Steel — headings, balances */
+  --text-secondary:       #6B707C;  /* Muted Blue-Grey — dates, labels */
+  --text-tertiary:        #9599A3;  /* Faded ink — placeholders, disabled */
+  --text-on-accent:       #F2F0ED;  /* Text on accent backgrounds */
+  --text-on-sage:         #F2F0ED;  /* Text on sage/income elements */
+  --text-on-terracotta:   #F2F0ED;  /* Text on terracotta/expense elements */
+
+  /* === SEMANTIC COLORS === */
+  --color-income:         #6B7D71;  /* Sage Moss — credits, deposits */
+  --color-income-light:   #8FA397;  /* Lighter sage for backgrounds */
+  --color-income-bg:      rgba(107, 125, 113, 0.1); /* Sage tinted background */
+  --color-expense:        #A37B6F;  /* Terracotta Clay — debits, expenses */
+  --color-expense-light:  #BF9D93;  /* Lighter terracotta for backgrounds */
+  --color-expense-bg:     rgba(163, 123, 111, 0.1); /* Terracotta tinted bg */
+  --color-accent:         #8B7355;  /* Aged Bronze — interactive elements */
+  --color-accent-hover:   #7A6549;  /* Darker bronze on hover */
+  --color-accent-light:   #D4C5A9;  /* Warm Sand — subtle highlights */
+
+  /* === VAULT SPECIFIC === */
+  --color-vault:          #5C6B5E;  /* Deep Forest — vault identity */
+  --color-vault-light:    #7A8B7C;  /* Lighter forest for vault accents */
+  --color-vault-bg:       rgba(92, 107, 94, 0.08); /* Vault tinted bg */
+
+  /* === STATUS === */
+  --color-warning:        #C4935A;  /* Warm Amber — caution */
+  --color-warning-bg:     rgba(196, 147, 90, 0.1);
+  --color-danger:         #B85C5C;  /* Muted Brick — critical */
+  --color-danger-bg:      rgba(184, 92, 92, 0.1);
+  --color-success:        #6B7D71;  /* Same as income (sage) */
+
+  /* === BURN RATE INDICATORS === */
+  --burn-safe:            #6B7D71;  /* Sage — on track */
+  --burn-caution:         #C4935A;  /* Amber — spending fast */
+  --burn-danger:          #B85C5C;  /* Brick — overspending */
+
+  /* === BORDERS & DIVIDERS === */
+  --border-default:       #CDC9C2;  /* Soft Linen — subtle lines */
+  --border-strong:        #B8B3AB;  /* Stronger border for emphasis */
+  --border-input:         #C5C0B8;  /* Input field borders */
+  --border-input-focus:   #8B7355;  /* Input focus — aged bronze */
+
+  /* === SHADOWS === */
+  --shadow-sm:            0 1px 3px rgba(42, 45, 52, 0.06);
+  --shadow-md:            0 4px 12px rgba(42, 45, 52, 0.08);
+  --shadow-lg:            0 8px 24px rgba(42, 45, 52, 0.10);
+  --shadow-card:          0 2px 8px rgba(42, 45, 52, 0.05);
+  --shadow-card-hover:    0 6px 20px rgba(42, 45, 52, 0.10);
+  --shadow-float:         0 8px 32px rgba(42, 45, 52, 0.12);
+
+  /* === GRADIENTS === */
+  --gradient-vault:       linear-gradient(135deg, #5C6B5E 0%, #4A5A4D 100%);
+  --gradient-accent:      linear-gradient(135deg, #8B7355 0%, #A38B6D 100%);
+  --gradient-paper:       linear-gradient(180deg, #F2F0ED 0%, #E8E5E0 100%);
+  --gradient-shimmer:     linear-gradient(90deg, transparent 0%, rgba(139, 115, 85, 0.08) 50%, transparent 100%);
+
+  /* === SPACING SCALE (8px base) === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* === BORDER RADIUS === */
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-full: 9999px;
+
+  /* === TRANSITIONS === */
+  --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth:     cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-bounce:     cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   400ms;
+  --duration-reveal: 600ms;
 }
 
+/* === TAILWIND v4 THEME (CSS-first config) === */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* -- Colors: Backgrounds -- */
+  --color-stone-global:          var(--bg-global);
+  --color-stone-surface:         var(--bg-surface);
+  --color-stone-surface-hover:   var(--bg-surface-hover);
+  --color-stone-nav:             var(--bg-navigation);
+  --color-stone-nav-active:      var(--bg-navigation-active);
+  --color-stone-overlay:         var(--bg-overlay);
+  --color-stone-input:           var(--bg-input);
+  --color-stone-skeleton:        var(--bg-skeleton);
+
+  /* -- Colors: Text (ink-*) -- */
+  --color-ink-primary:           var(--text-primary);
+  --color-ink-secondary:         var(--text-secondary);
+  --color-ink-tertiary:          var(--text-tertiary);
+  --color-ink-on-accent:         var(--text-on-accent);
+  --color-ink-on-sage:           var(--text-on-sage);
+  --color-ink-on-terracotta:     var(--text-on-terracotta);
+
+  /* -- Colors: Sage (income) -- */
+  --color-sage:                  var(--color-income);
+  --color-sage-light:            var(--color-income-light);
+  --color-sage-bg:               var(--color-income-bg);
+
+  /* -- Colors: Terracotta (expense) -- */
+  --color-terracotta:            var(--color-expense);
+  --color-terracotta-light:      var(--color-expense-light);
+  --color-terracotta-bg:         var(--color-expense-bg);
+
+  /* -- Colors: Bronze (accent) -- */
+  --color-bronze:                var(--color-accent);
+  --color-bronze-hover:          var(--color-accent-hover);
+  --color-bronze-light:          var(--color-accent-light);
+
+  /* -- Colors: Vault -- */
+  --color-vault:                 var(--color-vault);
+  --color-vault-light:           var(--color-vault-light);
+  --color-vault-bg:              var(--color-vault-bg);
+
+  /* -- Colors: Status -- */
+  --color-warning:               var(--color-warning);
+  --color-warning-bg:            var(--color-warning-bg);
+  --color-danger:                var(--color-danger);
+  --color-danger-bg:             var(--color-danger-bg);
+  --color-success:               var(--color-success);
+
+  /* -- Colors: Burn rate -- */
+  --color-burn-safe:             var(--burn-safe);
+  --color-burn-caution:          var(--burn-caution);
+  --color-burn-danger:           var(--burn-danger);
+
+  /* -- Colors: Borders -- */
+  --color-border-default:        var(--border-default);
+  --color-border-strong:         var(--border-strong);
+  --color-border-input:          var(--border-input);
+  --color-border-input-focus:    var(--border-input-focus);
+
+  /* -- Fonts -- */
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", monospace;
+
+  /* -- Shadows -- */
+  --shadow-sm:         var(--shadow-sm);
+  --shadow-md:         var(--shadow-md);
+  --shadow-lg:         var(--shadow-lg);
+  --shadow-card:       var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-float:      var(--shadow-float);
+
+  /* -- Border Radius -- */
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+  --radius-card:   var(--radius-md);
+  --radius-button: var(--radius-lg);
+
+  /* -- Animations -- */
+  --animate-float:       float 3s ease-in-out infinite;
+  --animate-shimmer:     shimmer 2s ease-in-out infinite;
+  --animate-ink-spread:  ink-spread 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-stamp:       stamp 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --animate-rise:        rise 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  --animate-pencil-draw: pencil-draw 0.8s ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* === KEYFRAMES === */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
 }
 
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes stamp {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.3); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes rise {
+  0%   { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pencil-draw {
+  0%   { stroke-dashoffset: 100%; opacity: 0; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes ink-spread {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* === PAPER TEXTURE OVERLAY (CSS noise — no image needed) === */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-global);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  color: var(--text-primary);
+  font-family: var(--font-body);
 }
