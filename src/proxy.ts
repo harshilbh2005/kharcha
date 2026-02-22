@@ -1,17 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
+// ── Phase 2: Tightened public routes ────────────────────────────
+// Only auth pages and webhooks are public.
+// Everything else requires Clerk authentication.
 const isPublicRoute = createRouteMatcher([
-  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
-  "/test(.*)",          // dev-only component showcase
-  // ── Phase 1 shell — all page shells are public until auth is wired ──
-  // Phase 2 will remove these and let only "/" + auth routes be public.
-  "/transactions(.*)",
-  "/analytics(.*)",
-  "/vault(.*)",
-  "/settings(.*)",
+  "/api/webhook/tasker(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
