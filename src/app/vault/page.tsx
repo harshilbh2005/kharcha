@@ -1,47 +1,43 @@
-import { Bell } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import Header from "@/components/layout/Header";
 
-// ─── Dashboard ─────────────────────────────────────────────────────────────────
+// ─── Emergency Vault ───────────────────────────────────────────────────────────
 //
-// Phase 4 — Financial command center.
+// Phase 5 — Emergency Vault system.
 // Will display:
-//   • Monthly allowance card with burn-rate ring
-//   • Quick-stats row (spent / remaining / vault)
-//   • Recent transactions (last 5)
-//   • Daily limit + safe/caution/danger indicator
+//   • Vault balance with animated vault-door opening (GSAP)
+//   • Funded-by-dad indicator (separate from allowance)
+//   • Withdrawal / deposit history
+//   • Repayment tracker for pass-through expenses
+//   • Sub-vault allocations (Tuition, Medical, Travel, …)
 //
 // For now: placeholder shell with Header + "coming soon" copy.
 
-export default function DashboardPage() {
+export default function VaultPage() {
   return (
     <>
       {/* ── Sticky page header ───────────────────────────────────────────── */}
       <Header
-        title="Kharcha"
+        title="Emergency Vault"
         rightElement={
-          // Notification bell — will wire to a notification drawer in Phase 4
-          <button
-            aria-label="Notifications"
+          // Vault status indicator — will show locked/unlocked state
+          <div
+            aria-label="Vault secured"
             style={{
               width:           40,
               height:          40,
               display:         "flex",
               alignItems:      "center",
               justifyContent:  "center",
-              borderRadius:    "50%",
-              border:          "none",
-              background:      "transparent",
-              cursor:          "pointer",
-              color:           "var(--text-secondary)",
+              color:           "var(--color-vault)",
             }}
           >
-            <Bell size={20} strokeWidth={1.8} />
-          </button>
+            <ShieldCheck size={20} strokeWidth={1.8} />
+          </div>
         }
       />
 
       {/* ── Placeholder body ─────────────────────────────────────────────── */}
-      {/* Fills the space between Header (56 px) and BottomNav (64 px).      */}
       <div
         style={{
           display:        "flex",
@@ -54,26 +50,41 @@ export default function DashboardPage() {
           gap:            "var(--space-4)",
         }}
       >
-        {/* ── Icon ────────────────────────────────────────────────────────── */}
+        {/* ── Icon — stylised vault door ───────────────────────────────────── */}
         <div
           style={{
             width:           72,
             height:          72,
-            borderRadius:    "50%",
-            backgroundColor: "var(--color-income-bg)",
+            borderRadius:    "var(--radius-md)",
+            background:      "var(--gradient-vault)",
             display:         "flex",
             alignItems:      "center",
             justifyContent:  "center",
             marginBottom:    "var(--space-2)",
+            boxShadow:       "0 4px 20px rgba(92, 107, 94, 0.30)",
           }}
         >
-          {/* Rupee glyph as display text — no icon import needed */}
-          <span
-            className="font-display"
-            style={{ fontSize: "2rem", color: "var(--color-income)", lineHeight: 1 }}
+          {/* Vault icon rendered as SVG lines for crisp display */}
+          <svg
+            width="34" height="34"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgba(255,255,255,0.90)"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            ₹
-          </span>
+            {/* Outer rect */}
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            {/* Lock circle */}
+            <circle cx="12" cy="12" r="3.5" />
+            {/* Spoke lines suggesting a combination dial */}
+            <line x1="12" y1="3"  x2="12" y2="8.5"  />
+            <line x1="12" y1="15.5" x2="12" y2="21" />
+            <line x1="3"  y1="12" x2="8.5"  y2="12" />
+            <line x1="15.5" y1="12" x2="21" y2="12" />
+          </svg>
         </div>
 
         {/* ── Tagline ─────────────────────────────────────────────────────── */}
@@ -81,21 +92,21 @@ export default function DashboardPage() {
           className="font-display"
           style={{ fontSize: "1.75rem", color: "var(--text-primary)", margin: 0 }}
         >
-          Your financial command center
+          Your safety net
         </h1>
 
         {/* ── Sub-copy ────────────────────────────────────────────────────── */}
         <p
           className="font-body"
           style={{
-            color:     "var(--text-secondary)",
-            fontSize:  "0.9375rem",
-            maxWidth:  "22rem",
+            color:      "var(--text-secondary)",
+            fontSize:   "0.9375rem",
+            maxWidth:   "22rem",
             lineHeight: 1.6,
-            margin:    0,
+            margin:     0,
           }}
         >
-          Balance cards, burn rate, and recent transactions — all at a glance.
+          Emergency funds, pass-through expenses, and repayment tracking — separate from your allowance.
         </p>
 
         {/* ── Phase badge ─────────────────────────────────────────────────── */}
@@ -104,15 +115,15 @@ export default function DashboardPage() {
           style={{
             marginTop:       "var(--space-2)",
             fontSize:        "0.75rem",
-            color:           "var(--color-accent)",
-            backgroundColor: "var(--color-expense-bg)",
-            border:          "1px solid var(--color-accent-light)",
+            color:           "var(--color-vault)",
+            backgroundColor: "var(--color-vault-bg)",
+            border:          "1px solid var(--color-vault-light)",
             borderRadius:    "var(--radius-full)",
             padding:         "4px 14px",
             letterSpacing:   "0.04em",
           }}
         >
-          Coming soon — Phase 4
+          Coming soon — Phase 5
         </div>
       </div>
     </>
