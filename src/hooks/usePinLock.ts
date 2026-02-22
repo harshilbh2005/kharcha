@@ -34,7 +34,11 @@ export function usePinLock(clerkUserId: string | null) {
   const { isUnlocked, clearKey, updateActivity } = useEncryptionStore();
   const setKey = useEncryptionStore((s) => s.setKey);
 
-  const [isLocked, setIsLocked] = useState(true);
+  // Initialize from Zustand store — if the encryption key is already in memory
+  // (e.g. user navigated between pages), skip the PIN screen.
+  const [isLocked, setIsLocked] = useState(
+    () => !useEncryptionStore.getState().isUnlocked,
+  );
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState<number | null>(null);
   const [isFullyLocked, setIsFullyLocked] = useState(false);

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { BottomNav, type FabOrigin } from "@/components/layout/BottomNav";
+import { AddExpenseModal } from "@/components/transactions/AddExpenseModal";
 
 // ─── Auth-route prefixes ────────────────────────────────────────────────────────
 
@@ -9,31 +11,39 @@ const AUTH_PATHS = ["/sign-in", "/sign-up"];
 
 // ─── BottomNavWrapper ───────────────────────────────────────────────────────────
 //
-// Phase 1 shell: renders BottomNav on every non-auth route.
-//
-// The proxy middleware already redirects unauthenticated users away from
-// protected routes before the page renders, so BottomNav only ever appears
-// in front of a user who is allowed to be on that page.
-//
-// Phase 2 will add back the Clerk isSignedIn guard once real encrypted data
-// is behind the nav tabs and we need to guarantee the nav never surfaces to
-// a signed-out visitor.
-//
-// NOTE: We intentionally removed useAuth() here because the Clerk JS bundle
-// loads asynchronously from Clerk's CDN.  If that request is slow or fails
-// (e.g. network issues in dev, ad-blockers, offline mode), isLoaded stays
-// false indefinitely and the nav never mounts — a bad DX during shell work.
-// The pathname check is instant and sufficient for Phase 1.
+// Owns the add-expense modal lifecycle:
+//   1. Renders BottomNav and wires the FAB's onAddPress.
+//   2. When the FAB is pressed, captures its center coordinates (via BottomNav's
+//      FabOrigin callback) and opens AddExpenseModal.
+//   3. AddExpenseModal uses those coordinates as the InkSpread origin so the
+//      ink appears to burst from the FAB button.
 
 export function BottomNavWrapper() {
   const pathname = usePathname();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [fabOrigin, setFabOrigin] = useState<FabOrigin>({ x: 0, y: 0 });
 
   // Never render on Clerk auth pages — they own their full-screen layout.
   // startsWith covers sub-paths like /sign-in/sso-callback.
   const isAuthPage = AUTH_PATHS.some((prefix) => pathname.startsWith(prefix));
   if (isAuthPage) return null;
 
-  return <BottomNav />;
+  const handleAddPress = (origin: FabOrigin) => {
+    setFabOrigin(origin);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <>
+      <BottomNav onAddPress={handleAddPress} />
+      <AddExpenseModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        origin={fabOrigin}
+      />
+    </>
+  );
 }
 
 export default BottomNavWrapper;

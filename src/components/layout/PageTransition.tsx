@@ -70,37 +70,33 @@ const pageTransition = {
 
 export function PageTransition({ children, className = "" }: PageTransitionProps) {
   return (
-    // Perspective wrapper — gives the rotateY animation depth without
-    // the motion.div itself owning the perspective (which Framer would override).
-    <div style={{ perspective: "1200px" }}>
-      <motion.div
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        transition={pageTransition}
-        className={className}
-        style={{
-          // ── Size ──────────────────────────────────────────────────────────
-          // 64 px = BottomNav visible height (not including safe-area padding)
-          minHeight: "calc(100vh - 64px)",
-          paddingBottom: "80px",
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className={className}
+      style={{
+        // ── Size ──────────────────────────────────────────────────────────
+        // 64 px = BottomNav visible height (not including safe-area padding)
+        minHeight: "calc(100vh - 64px)",
+        paddingBottom: "80px",
 
-          // ── Clip horizontal overflow during slide ──────────────────────
-          // IMPORTANT: Use "clip" not "hidden".  overflow:hidden creates a new
-          // scroll container which breaks position:sticky on child elements
-          // (e.g. the Header component). overflow:clip clips visually without
-          // establishing a scroll container, so sticky headers work correctly.
-          overflowX: "clip",
+        // ── Clip horizontal overflow during slide ──────────────────────
+        // IMPORTANT: Use "clip" not "hidden".  overflow:hidden creates a new
+        // scroll container which breaks position:sticky on child elements
+        // (e.g. the Header component). overflow:clip clips visually without
+        // establishing a scroll container, so sticky headers work correctly.
+        overflowX: "clip",
 
-          // ── Transform origin for rotateY ──────────────────────────────
-          // Center origin keeps the tilt symmetric around the page centre
-          transformOrigin: "center center",
-        }}
-      >
-        {children}
-      </motion.div>
-    </div>
+        // ── Transform origin for rotateY ──────────────────────────────
+        // Center origin keeps the tilt symmetric around the page centre
+        transformOrigin: "center center",
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
 

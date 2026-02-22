@@ -9,7 +9,7 @@
 import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth';
 import AuthGate from '@/components/layout/AuthGate';
-import { BottomNav } from '@/components/layout/BottomNav';
+import { BottomNavWrapper } from '@/components/layout/BottomNavWrapper';
 
 export default async function AppLayout({
   children,
@@ -26,7 +26,7 @@ export default async function AppLayout({
   return (
     <AuthGate pinEnabled={profile.pin_enabled}>
       {children}
-      <BottomNav />
+      <BottomNavWrapper />
     </AuthGate>
   );
 }

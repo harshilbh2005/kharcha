@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -92,7 +93,20 @@ function NavTabItem({ tab, active }: { tab: TabDef; active: boolean }) {
 
 // ─── AddButton ─────────────────────────────────────────────────────────────────
 
-function AddButton({ onPress }: { onPress?: () => void }) {
+/** Origin: center coordinates of the FAB for the InkSpread animation. */
+export type FabOrigin = { x: number; y: number };
+
+function AddButton({ onPress }: { onPress?: (origin: FabOrigin) => void }) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = () => {
+    const rect = btnRef.current?.getBoundingClientRect();
+    const origin: FabOrigin = rect
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : { x: window.innerWidth / 2, y: window.innerHeight - 52 }; // fallback
+    onPress?.(origin);
+  };
+
   return (
     // Wrapper keeps the button centred inside its flex-1 slot
     <div
@@ -100,10 +114,8 @@ function AddButton({ onPress }: { onPress?: () => void }) {
       style={{ minWidth: 44 }}
     >
       <motion.button
-        onClick={() => {
-          console.log("Add pressed");
-          onPress?.();
-        }}
+        ref={btnRef}
+        onClick={handleClick}
         // Continuous 2 px vertical oscillation — the "floating FAB" feel
         animate={{ y: [0, -2, 0] }}
         transition={{
@@ -139,8 +151,8 @@ function AddButton({ onPress }: { onPress?: () => void }) {
 // ─── BottomNav ─────────────────────────────────────────────────────────────────
 
 export interface BottomNavProps {
-  /** Called when the centre Add button is pressed */
-  onAddPress?: () => void;
+  /** Called with the FAB's center coordinates when the Add button is pressed. */
+  onAddPress?: (origin: FabOrigin) => void;
 }
 
 export function BottomNav({ onAddPress }: BottomNavProps) {

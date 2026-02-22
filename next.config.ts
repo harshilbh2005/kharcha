@@ -14,6 +14,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://img.clerk.com",
       `connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.clerk.com https://api.exchangerate-api.com https://*.clerk.accounts.dev${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
       "frame-src 'self' https://challenges.cloudflare.com",
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
     ].join("; "),
