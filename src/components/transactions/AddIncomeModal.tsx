@@ -25,7 +25,7 @@ import { useCreateIncome } from '@/hooks/useIncome';
 import { useEncryption } from '@/hooks/useEncryption';
 import { useToast } from '@/components/ui/ToastProvider';
 import { amountSchema } from '@/lib/validations';
-import { getVaultBalance } from '@/app/actions/vault';
+import { getVault } from '@/app/actions/vault';
 import type { IncomeType } from '@/types';
 import type { VaultUpdatePayload } from '@/app/actions/income';
 
@@ -277,12 +277,13 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
       // Build vault payload for emergency_fund (client must compute new balance)
       let vaultPayload: VaultUpdatePayload | undefined;
       if (incomeType === 'emergency_fund') {
-        const vaultRes = await getVaultBalance();
+        const vaultRes = await getVault();
         if ('error' in vaultRes) {
           toast({ title: 'Vault error', description: vaultRes.error, variant: 'error' });
           return;
         }
-        const currentBalance = await decrypt(vaultRes.data.current_balance_encrypted);
+        const currentBalanceEnc = vaultRes.data.vault.current_balance_encrypted;
+        const currentBalance = currentBalanceEnc === '0' ? 0 : await decrypt(currentBalanceEnc);
         const newBalance = currentBalance + amount;
         const { encrypted: newBalEnc, hash: newBalHash } = await encrypt(newBalance);
         vaultPayload = {

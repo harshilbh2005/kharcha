@@ -1,35 +1,55 @@
-import { ShieldCheck } from "lucide-react";
-import Header from "@/components/layout/Header";
+'use client';
 
-// ─── Emergency Vault ───────────────────────────────────────────────────────────
+// ============================================================
+// KHARCHA — Emergency Vault Page (Phase 5)
 //
-// Phase 5 — Emergency Vault system.
-// Will display:
-//   • Vault balance with animated vault-door opening (GSAP)
-//   • Funded-by-dad indicator (separate from allowance)
-//   • Withdrawal / deposit history
-//   • Repayment tracker for pass-through expenses
-//   • Sub-vault allocations (Tuition, Medical, Travel, …)
+// Layout:
+//   • Header: "Emergency Vault" + Shield icon
+//   • VaultDoor: GSAP animated safe-door (plays once on load)
+//   • VaultBalance: ProgressRing + OdometerValue + status badge
+//   • Action buttons: [Deposit] [Withdraw] side by side
+//   • VaultHistory: scrollable transaction ledger
 //
-// For now: placeholder shell with Header + "coming soon" copy.
+// Data flows:
+//   useVault() → balance, target, transactions (all decrypted)
+//   useVaultDeposit() / useVaultWithdraw() → mutations via modals
+// ============================================================
+
+import { useState } from 'react';
+import { ShieldCheck, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+
+import Header from '@/components/layout/Header';
+import { StaggerContainer } from '@/components/animations/StaggerContainer';
+import Skeleton from '@/components/ui/Skeleton';
+import Button from '@/components/ui/Button';
+import { VaultDoor } from '@/components/vault/VaultDoor';
+import { VaultBalance } from '@/components/vault/VaultBalance';
+import { VaultHistory } from '@/components/vault/VaultHistory';
+import { DepositModal } from '@/components/vault/DepositModal';
+import { WithdrawModal } from '@/components/vault/WithdrawModal';
+import { useVault } from '@/hooks/useVault';
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function VaultPage() {
+  const { data: vault, isLoading } = useVault();
+
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+
   return (
     <>
-      {/* ── Sticky page header ───────────────────────────────────────────── */}
+      {/* ── Sticky page header ────────────────────────────────────────────── */}
       <Header
         title="Emergency Vault"
         rightElement={
-          // Vault status indicator — will show locked/unlocked state
           <div
             aria-label="Vault secured"
+            className="flex items-center justify-center"
             style={{
-              width:           40,
-              height:          40,
-              display:         "flex",
-              alignItems:      "center",
-              justifyContent:  "center",
-              color:           "var(--color-vault)",
+              width: 40,
+              height: 40,
+              color: 'var(--color-vault)',
             }}
           >
             <ShieldCheck size={20} strokeWidth={1.8} />
@@ -37,95 +57,147 @@ export default function VaultPage() {
         }
       />
 
-      {/* ── Placeholder body ─────────────────────────────────────────────── */}
+      {/* ── Main content ──────────────────────────────────────────────────── */}
       <div
+        className="px-4 pb-24"
+        style={{ paddingTop: 'var(--space-4)' }}
+      >
+        {isLoading ? (
+          <VaultSkeleton />
+        ) : (
+          <StaggerContainer className="flex flex-col gap-5 items-center" staggerDelay={0.08}>
+            {/* ── Vault door animation ─────────────────────────────────────── */}
+            <div className="pt-2 pb-1">
+              <VaultDoor size={180} />
+            </div>
+
+            {/* ── Balance + progress ring ──────────────────────────────────── */}
+            <div
+              className="w-full p-5 flex flex-col items-center"
+              style={{
+                background: 'var(--bg-surface)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-default)',
+              }}
+            >
+              <VaultBalance
+                currentBalance={vault?.currentBalance ?? 0}
+                targetAmount={vault?.targetAmount ?? null}
+                transactions={vault?.transactions ?? []}
+              />
+            </div>
+
+            {/* ── Action buttons ───────────────────────────────────────────── */}
+            <div className="flex gap-3 w-full">
+              <Button
+                onClick={() => setDepositOpen(true)}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                className="!border-[var(--color-income)] !text-[var(--color-income)]"
+              >
+                <ArrowDownToLine size={18} strokeWidth={2} />
+                Deposit
+              </Button>
+
+              <Button
+                onClick={() => setWithdrawOpen(true)}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                className="!border-[var(--color-expense)] !text-[var(--color-expense)]"
+              >
+                <ArrowUpFromLine size={18} strokeWidth={2} />
+                Withdraw
+              </Button>
+            </div>
+
+            {/* ── Transaction history ──────────────────────────────────────── */}
+            <div
+              className="w-full"
+              style={{
+                background: 'var(--bg-surface)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-default)',
+                padding: 'var(--space-5)',
+              }}
+            >
+              <h3
+                className="font-display text-base mb-3"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                History
+              </h3>
+              <VaultHistory transactions={vault?.transactions ?? []} />
+            </div>
+          </StaggerContainer>
+        )}
+      </div>
+
+      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      <DepositModal
+        isOpen={depositOpen}
+        onClose={() => setDepositOpen(false)}
+        currentBalance={vault?.currentBalance ?? 0}
+      />
+
+      <WithdrawModal
+        isOpen={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        currentBalance={vault?.currentBalance ?? 0}
+      />
+    </>
+  );
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function VaultSkeleton() {
+  return (
+    <div className="flex flex-col gap-5 items-center">
+      {/* Door placeholder */}
+      <Skeleton.Circle width="180px" />
+
+      {/* Balance card skeleton */}
+      <div
+        className="w-full p-5 flex flex-col items-center gap-3"
         style={{
-          display:        "flex",
-          flexDirection:  "column",
-          alignItems:     "center",
-          justifyContent: "center",
-          minHeight:      "calc(100vh - 56px - 64px)",
-          padding:        "var(--space-8)",
-          textAlign:      "center",
-          gap:            "var(--space-4)",
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-default)',
         }}
       >
-        {/* ── Icon — stylised vault door ───────────────────────────────────── */}
-        <div
-          style={{
-            width:           72,
-            height:          72,
-            borderRadius:    "var(--radius-md)",
-            background:      "var(--gradient-vault)",
-            display:         "flex",
-            alignItems:      "center",
-            justifyContent:  "center",
-            marginBottom:    "var(--space-2)",
-            boxShadow:       "0 4px 20px rgba(92, 107, 94, 0.30)",
-          }}
-        >
-          {/* Vault icon rendered as SVG lines for crisp display */}
-          <svg
-            width="34" height="34"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgba(255,255,255,0.90)"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            {/* Outer rect */}
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            {/* Lock circle */}
-            <circle cx="12" cy="12" r="3.5" />
-            {/* Spoke lines suggesting a combination dial */}
-            <line x1="12" y1="3"  x2="12" y2="8.5"  />
-            <line x1="12" y1="15.5" x2="12" y2="21" />
-            <line x1="3"  y1="12" x2="8.5"  y2="12" />
-            <line x1="15.5" y1="12" x2="21" y2="12" />
-          </svg>
-        </div>
-
-        {/* ── Tagline ─────────────────────────────────────────────────────── */}
-        <h1
-          className="font-display"
-          style={{ fontSize: "1.75rem", color: "var(--text-primary)", margin: 0 }}
-        >
-          Your safety net
-        </h1>
-
-        {/* ── Sub-copy ────────────────────────────────────────────────────── */}
-        <p
-          className="font-body"
-          style={{
-            color:      "var(--text-secondary)",
-            fontSize:   "0.9375rem",
-            maxWidth:   "22rem",
-            lineHeight: 1.6,
-            margin:     0,
-          }}
-        >
-          Emergency funds, pass-through expenses, and repayment tracking — separate from your allowance.
-        </p>
-
-        {/* ── Phase badge ─────────────────────────────────────────────────── */}
-        <div
-          className="font-mono"
-          style={{
-            marginTop:       "var(--space-2)",
-            fontSize:        "0.75rem",
-            color:           "var(--color-vault)",
-            backgroundColor: "var(--color-vault-bg)",
-            border:          "1px solid var(--color-vault-light)",
-            borderRadius:    "var(--radius-full)",
-            padding:         "4px 14px",
-            letterSpacing:   "0.04em",
-          }}
-        >
-          Coming soon — Phase 5
-        </div>
+        <Skeleton.Circle width="140px" />
+        <Skeleton.Line width="120px" height="14px" />
+        <Skeleton.Line width="80px" height="24px" />
       </div>
-    </>
+
+      {/* Button row skeleton */}
+      <div className="flex gap-3 w-full">
+        <Skeleton.Line width="100%" height="48px" />
+        <Skeleton.Line width="100%" height="48px" />
+      </div>
+
+      {/* History skeleton */}
+      <div
+        className="w-full p-5 flex flex-col gap-3"
+        style={{
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-default)',
+        }}
+      >
+        <Skeleton.Line width="60px" height="16px" />
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <Skeleton.Line width={`${120 - i * 15}px`} height="14px" />
+              <Skeleton.Line width="70px" height="12px" />
+            </div>
+            <Skeleton.Line width="60px" height="14px" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
