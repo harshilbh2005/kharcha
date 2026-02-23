@@ -1,4 +1,5 @@
-import { SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
+import { SlidersHorizontal, RefreshCw, ChevronRight } from "lucide-react";
 import Header from "@/components/layout/Header";
 
 // ─── Settings ──────────────────────────────────────────────────────────────────
@@ -38,6 +39,46 @@ export default function SettingsPage() {
           </div>
         }
       />
+
+      {/* ── Quick links (functional before Phase 9) ──────────────────────── */}
+      <div
+        style={{
+          padding:    "var(--space-4) var(--space-5) 0",
+          display:    "flex",
+          flexDirection: "column",
+          gap:        "1px",
+          maxWidth:   "28rem",
+          margin:     "0 auto",
+          width:      "100%",
+        }}
+      >
+        <Link
+          href="/subscriptions"
+          style={{
+            display:         "flex",
+            alignItems:      "center",
+            justifyContent:  "space-between",
+            padding:         "14px 16px",
+            backgroundColor: "var(--bg-surface)",
+            border:          "1px solid var(--border-default)",
+            borderRadius:    "var(--radius-md)",
+            textDecoration:  "none",
+            color:           "var(--text-primary)",
+            gap:             "var(--space-3)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <RefreshCw size={18} strokeWidth={1.7} color="var(--color-accent)" />
+            <span
+              className="font-body text-sm"
+              style={{ fontWeight: 500, color: "var(--text-primary)" }}
+            >
+              Manage Subscriptions
+            </span>
+          </div>
+          <ChevronRight size={18} strokeWidth={1.7} color="var(--text-secondary)" />
+        </Link>
+      </div>
 
       {/* ── Placeholder body ─────────────────────────────────────────────── */}
       <div

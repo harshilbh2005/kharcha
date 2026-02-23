@@ -8,6 +8,7 @@
 
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { clerkClient } from '@clerk/nextjs/server';
 import { createClient } from '@/lib/supabase/server';
 
 const BCRYPT_ROUNDS = 12;
@@ -163,6 +164,21 @@ export async function completeOnboarding(data: {
   if (settingsError) {
     console.error('Failed to create app settings:', settingsError);
     // Non-fatal — continue
+  }
+
+  // ── 8. Mark onboarding complete in Clerk publicMetadata ───────
+  // This is read by the middleware (via sessionClaims.metadata) to
+  // gate routing — no DB call required on every request.
+  try {
+    const client = await clerkClient();
+    await client.users.updateUser(clerkUserId, {
+      publicMetadata: { onboarding_completed: true },
+    });
+  } catch (e) {
+    // Non-fatal — the Supabase profile already has onboarding_completed:true.
+    // The middleware will fall back gracefully: at worst the user sees
+    // /onboarding again until their Clerk session token refreshes.
+    console.error('Failed to update Clerk publicMetadata:', e);
   }
 
   return { success: true, salt: saltBase64 };

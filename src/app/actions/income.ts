@@ -176,6 +176,7 @@ export async function createIncome(
         description: validated.description ?? null,
         pass_through_for: validated.pass_through_for ?? null,
         date: validated.date ?? today,
+        target_month: validated.target_month ?? null,
         source: 'manual',
       })
       .select()

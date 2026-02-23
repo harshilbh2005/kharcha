@@ -4,12 +4,11 @@
 // KHARCHA — Subscriptions Page (Phase 6)
 //
 // Layout:
-//   - Header: "Subscriptions" + RefreshCw icon
+//   - Header: "Subscriptions" + back button + "+" button
 //   - BurnRateCard: monthly total + breakdown bar
 //   - "Due Soon" section: subs renewing within 7 days
 //   - "Active Subscriptions" section: all active subs
-//   - Fixed bottom button: [+ Add Subscription]
-//   - AddSubscriptionModal
+//   - AddSubscriptionModal (opened via header "+" or empty-state button)
 //
 // Data flow:
 //   useSubscriptions({ is_active: true }) → encrypted subs
@@ -18,6 +17,7 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { RefreshCw, Plus } from 'lucide-react';
 
 import Header from '@/components/layout/Header';
@@ -172,18 +172,28 @@ export default function SubscriptionsPage() {
       {/* ── Sticky page header ────────────────────────────────────────────── */}
       <Header
         title="Subscriptions"
+        showBack
         rightElement={
-          <div
-            aria-label="Subscription tracking"
-            className="flex items-center justify-center"
+          <motion.button
+            type="button"
+            onClick={handleAdd}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Add subscription"
             style={{
               width: 40,
               height: 40,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
               color: 'var(--color-accent)',
             }}
           >
-            <RefreshCw size={20} strokeWidth={1.8} />
-          </div>
+            <Plus size={22} strokeWidth={2} />
+          </motion.button>
         }
       />
 
@@ -257,23 +267,6 @@ export default function SubscriptionsPage() {
             </div>
           </StaggerContainer>
         )}
-      </div>
-
-      {/* ── Fixed bottom add button ──────────────────────────────────────── */}
-      <div
-        className="fixed bottom-20 left-0 right-0 flex justify-center z-30 pointer-events-none"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
-      >
-        <Button
-          onClick={handleAdd}
-          size="lg"
-          className="pointer-events-auto shadow-lg"
-        >
-          <Plus size={20} strokeWidth={2} />
-          Add Subscription
-        </Button>
       </div>
 
       {/* ── Modal ────────────────────────────────────────────────────────── */}

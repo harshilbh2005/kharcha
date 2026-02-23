@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Minus, Plus } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
@@ -56,6 +57,7 @@ export function AddSubscriptionModal({
   editSubscription,
   exchangeRate,
 }: AddSubscriptionModalProps) {
+  const router = useRouter();
   const isEditing = Boolean(editSubscription);
 
   // ── Form state ──────────────────────────────────────────────────────────────
@@ -495,6 +497,20 @@ export function AddSubscriptionModal({
             {isEditing ? 'Update Subscription' : 'Add Subscription'}
           </Button>
         </div>
+
+        {/* ── 9. View all link (discover the full subscriptions page) ──── */}
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            // Small delay so the modal close animation doesn't clash
+            setTimeout(() => router.push('/subscriptions'), 150);
+          }}
+          className="text-center text-sm font-body pt-1 pb-2"
+          style={{ color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          View all subscriptions →
+        </button>
       </div>
     </Modal>
   );

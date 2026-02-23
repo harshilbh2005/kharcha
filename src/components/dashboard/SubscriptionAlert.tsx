@@ -114,6 +114,17 @@ export function SubscriptionAlert({
             </p>
           </motion.div>
         ))}
+
+        {/* "View all" hint — reinforces that the whole card is tappable */}
+        <motion.p
+          className="font-body text-xs mt-1.5"
+          style={{ color: 'var(--color-accent)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: delay + 0.5 }}
+        >
+          View all subscriptions →
+        </motion.p>
       </div>
     </Card>
   );

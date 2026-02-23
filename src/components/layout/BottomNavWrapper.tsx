@@ -1,47 +1,42 @@
 "use client";
 
-import { useState } from "react";
+// ============================================================
+// KHARCHA — BottomNavWrapper
+//
+// Renders the bottom navigation bar and the floating action menu.
+// Both are suppressed on Clerk auth pages (/sign-in, /sign-up)
+// and the onboarding wizard, which own their full-screen layouts.
+//
+// Modal lifecycle is now entirely owned by FABMenu — this wrapper
+// only decides whether to mount the two components.
+// ============================================================
+
 import { usePathname } from "next/navigation";
-import { BottomNav, type FabOrigin } from "@/components/layout/BottomNav";
-import { AddExpenseModal } from "@/components/transactions/AddExpenseModal";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { FABMenu } from "@/components/layout/FABMenu";
 
-// ─── Auth-route prefixes ────────────────────────────────────────────────────────
+// ─── Suppressed-route prefixes ─────────────────────────────────────────────────
 
-const AUTH_PATHS = ["/sign-in", "/sign-up"];
+const HIDDEN_PATHS = ["/sign-in", "/sign-up", "/onboarding"];
 
 // ─── BottomNavWrapper ───────────────────────────────────────────────────────────
-//
-// Owns the add-expense modal lifecycle:
-//   1. Renders BottomNav and wires the FAB's onAddPress.
-//   2. When the FAB is pressed, captures its center coordinates (via BottomNav's
-//      FabOrigin callback) and opens AddExpenseModal.
-//   3. AddExpenseModal uses those coordinates as the InkSpread origin so the
-//      ink appears to burst from the FAB button.
 
 export function BottomNavWrapper() {
   const pathname = usePathname();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [fabOrigin, setFabOrigin] = useState<FabOrigin>({ x: 0, y: 0 });
-
-  // Never render on Clerk auth pages — they own their full-screen layout.
+  // Suppress on auth / onboarding pages — they own their full-screen layout.
   // startsWith covers sub-paths like /sign-in/sso-callback.
-  const isAuthPage = AUTH_PATHS.some((prefix) => pathname.startsWith(prefix));
-  if (isAuthPage) return null;
-
-  const handleAddPress = (origin: FabOrigin) => {
-    setFabOrigin(origin);
-    setIsModalOpen(true);
-  };
+  if (HIDDEN_PATHS.some((prefix) => pathname.startsWith(prefix))) return null;
 
   return (
     <>
-      <BottomNav onAddPress={handleAddPress} />
-      <AddExpenseModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        origin={fabOrigin}
-      />
+      <BottomNav />
+      {/*
+        FABMenu renders its own position:fixed FAB button (z-52), overlay
+        (z-50), and fan buttons (z-51) — all floating above BottomNav's
+        z-40 bar without being trapped in its stacking context.
+      */}
+      <FABMenu />
     </>
   );
 }

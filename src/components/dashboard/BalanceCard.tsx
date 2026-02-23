@@ -1,18 +1,21 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import Card from '@/components/ui/Card';
 import { OdometerValue } from '@/components/animations/OdometerValue';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface BalanceCardProps {
-  /** Available budget remaining this month (₹) */
-  availableBudget: number;
-  /** Total spent so far this month (₹) — excludes pass-through */
+  /** Available balance remaining (₹) */
+  availableBalance: number;
+  /** Total spent so far (₹) — excludes pass-through */
   totalSpent: number;
-  /** Total budget for the month (allowance + bonus) */
+  /** Total budget (allowance + bonus) */
   totalBudget: number;
+  /** Budget horizon date — spending must last until this date */
+  budgetHorizon: Date | null;
   /** Stagger delay for card entrance animation */
   delay?: number;
 }
@@ -28,8 +31,8 @@ function formatINR(amount: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 //
-// Primary dashboard card — shows the main available balance with a rolling
-// odometer animation and a progress bar visualising spending against budget.
+// Primary dashboard card — shows the available balance with a rolling
+// odometer animation, progress bar, and the budget horizon date.
 //
 // Layout:
 //   ┌────────────────────────────────────────┐
@@ -37,27 +40,32 @@ function formatINR(amount: number): string {
 //   │  ₹12,345                   (odometer)  │
 //   │  ████████░░░░░░░░░░░░       (progress) │
 //   │  ₹8,655 spent of ₹21,000    (caption)  │
+//   │  Covers you until March 31   (horizon)  │
 //   └────────────────────────────────────────┘
 
 export function BalanceCard({
-  availableBudget,
+  availableBalance,
   totalSpent,
   totalBudget,
+  budgetHorizon,
   delay = 0,
 }: BalanceCardProps) {
-  // Percentage spent — clamped 0–100 for the progress bar width
+  const isLow = availableBalance <= 0;
+  const horizonLabel = budgetHorizon
+    ? format(budgetHorizon, 'MMMM d')
+    : null;
+
+  // Progress bar: percentage of budget spent, clamped 0–100
   const spentPercent = totalBudget > 0
     ? Math.min(100, Math.max(0, (totalSpent / totalBudget) * 100))
     : 0;
 
-  // Progress bar colour: gradient from sage (low spend) → terracotta (overspending)
-  // At 0% → pure sage, at 100% → pure terracotta, smooth blend between
   const progressColor =
     spentPercent <= 50
-      ? 'var(--color-income)'         // Sage — healthy
+      ? 'var(--color-income)'       // Sage — healthy
       : spentPercent <= 80
-        ? 'var(--color-accent)'       // Bronze — moderate
-        : 'var(--color-expense)';     // Terracotta — high spend
+        ? 'var(--color-accent)'     // Bronze — moderate
+        : 'var(--color-expense)';   // Terracotta — high spend
 
   return (
     <Card animated delay={delay}>
@@ -72,10 +80,11 @@ export function BalanceCard({
       {/* ── Main balance (animated odometer, xl size) ──────────────────────── */}
       <div className="mt-2 mb-4">
         <OdometerValue
-          value={availableBudget}
+          value={availableBalance}
           prefix="₹"
           size="xl"
           duration={900}
+          colored={isLow}
         />
       </div>
 
@@ -109,7 +118,7 @@ export function BalanceCard({
         />
       </div>
 
-      {/* ── Caption ────────────────────────────────────────────────────────── */}
+      {/* ── Spent caption ────────────────────────────────────────────────── */}
       <p
         className="font-body text-sm mt-2"
         style={{ color: 'var(--text-secondary)' }}
@@ -120,6 +129,16 @@ export function BalanceCard({
         {' spent of '}
         <span className="font-mono">₹{formatINR(totalBudget)}</span>
       </p>
+
+      {/* ── Horizon line ─────────────────────────────────────────────────── */}
+      {horizonLabel && (
+        <p
+          className="font-body text-xs mt-1"
+          style={{ color: isLow ? 'var(--color-expense)' : 'var(--text-secondary)' }}
+        >
+          {isLow ? 'Budget exhausted' : `Covers you until ${horizonLabel}`}
+        </p>
+      )}
     </Card>
   );
 }

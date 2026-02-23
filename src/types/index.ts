@@ -125,6 +125,7 @@ export interface IncomeEntry {
   raw_sms: string | null;
   date: string;
   month_year: string; // generated
+  target_month: string | null; // "YYYY-MM" — which month this allowance covers
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +142,7 @@ export interface IncomeEntryCreate {
   source?: TransactionSource;
   raw_sms?: string | null;
   date?: string;
+  target_month?: string | null;
 }
 
 export interface IncomeEntryDecrypted extends Omit<IncomeEntry, 'amount_encrypted' | 'amount_hash'> {
@@ -203,6 +205,8 @@ export interface TransactionCreate {
 
 export interface TransactionDecrypted extends Omit<Transaction, 'amount_encrypted' | 'amount_hash'> {
   amount: number;
+  /** For income entries: which month the allowance covers (YYYY-MM) */
+  target_month?: string | null;
 }
 
 // ============================================================
@@ -490,24 +494,26 @@ export interface AppSettingsCreate {
 // BUSINESS LOGIC: Budget (Section 7.1)
 // ============================================================
 
-export interface BudgetState {
-  totalAllowance: number;
-  totalBonus: number;
+export interface BudgetInput {
+  totalIncome: number;
   totalExpenses: number;
+  todayExpenses: number;
   expectedSubscriptions: number;
-  dayOfMonth: number;
-  daysInMonth: number;
+  latestTargetMonth: string | null;
   isWeekend: boolean;
 }
 
 export interface BudgetResult {
-  availableBudget: number;
+  availableBalance: number;
+  budgetHorizon: Date;
+  daysRemaining: number;
   dailyLimit: number;
+  weeklyBudget: number;
   burnRate: number;
   burnStatus: BurnStatus;
-  projectedMonthEnd: number;
+  projectedEndBalance: number;
   daysUntilBroke: number | null;
-  weeklyBudget: number;
+  todayRemaining: number;
 }
 
 // ============================================================
@@ -552,13 +558,38 @@ export interface ParsedSMS {
 // UTILITY TYPES
 // ============================================================
 
-/** Return type from the calculate_monthly_budget SQL function */
-export interface MonthlyBudgetQueryResult {
-  month: string;
+/** Return type from GET /api/budget/current */
+export interface BudgetQueryResult {
+  /** All budget-relevant income entries (encrypted amounts) */
   total_income: Array<{ amount: string; type: IncomeType }>;
+  /** All non-pass-through expenses (encrypted amounts) */
   total_expenses: Array<{ amount: string; category: string | null }>;
-  days_remaining: number;
-  days_elapsed: number;
+  /** Today's expenses only (encrypted amounts) — for todayRemaining */
+  today_expenses: Array<{ amount: string }>;
+  /** Furthest target_month from income entries, e.g. "2026-03", or null */
+  latest_target_month: string | null;
+  /** Encrypted amounts for unpaid subscriptions due before horizon */
+  expected_subscriptions: Array<{ amount: string; name: string }>;
+}
+
+/** Return type from GET /api/analytics/monthly/[monthYear] */
+export interface MonthlyAnalyticsQueryResult {
+  month_year: string;
+  /** All income entries with date in that month (encrypted amounts) */
+  income: Array<{
+    amount: string;
+    type: IncomeType;
+    /** "YYYY-MM" — which month this allowance covers, may differ from received month */
+    target_month: string | null;
+    date: string;
+  }>;
+  /** All non-pass-through expenses with date in that month (encrypted amounts) */
+  expenses: Array<{
+    amount: string;
+    category_name: string | null;
+    category_id: string | null;
+    is_subscription: boolean;
+  }>;
 }
 
 /** Encryption key bundle held in memory */

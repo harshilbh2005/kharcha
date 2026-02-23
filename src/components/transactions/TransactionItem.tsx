@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
-import { ArrowRightLeft, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Calendar, RefreshCw, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { format, parse } from "date-fns";
 import { getIcon } from "@/lib/icon-map";
 import { PaperCrumple } from "@/components/animations/PaperCrumple";
 import type { TransactionDecrypted } from "@/types";
@@ -16,6 +17,17 @@ function formatAmount(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+/** Format "YYYY-MM" → "Mon YYYY" (e.g. "2026-03" → "Mar 2026") */
+function formatTargetMonth(ym: string): string {
+  const d = parse(ym, "yyyy-MM", new Date());
+  return format(d, "MMM yyyy");
+}
+
+/** Derive the "YYYY-MM" of the transaction's own date */
+function txMonth(dateStr: string): string {
+  return dateStr.slice(0, 7); // "2026-02-23" → "2026-02"
 }
 
 function formatTime(time: string | null): string {
@@ -103,6 +115,12 @@ export function TransactionItem({
   const isIncome  = transaction.amount > 0;
   const amountColor = isIncome ? "var(--color-income)" : "var(--color-expense)";
   const amountStr   = (isIncome ? "+" : "−") + formatAmount(Math.abs(transaction.amount));
+
+  // Show "For Mon YYYY" badge when income covers a different month than received
+  const showTargetBadge =
+    isIncome &&
+    transaction.target_month &&
+    transaction.target_month !== txMonth(transaction.date);
 
   const label = transaction.merchant || transaction.description;
 
@@ -207,6 +225,20 @@ export function TransactionItem({
                 style={{ color: "var(--text-secondary)" }}
               >
                 {formatTime(transaction.time)}
+              </span>
+            )}
+            {showTargetBadge && (
+              <span
+                className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full"
+                style={{
+                  background: "var(--color-accent)" + "15",
+                  color: "var(--color-accent)",
+                  fontSize: 10,
+                  lineHeight: 1,
+                }}
+              >
+                <Calendar size={9} />
+                For {formatTargetMonth(transaction.target_month!)}
               </span>
             )}
           </div>

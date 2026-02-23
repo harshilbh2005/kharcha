@@ -20,6 +20,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { Bell } from 'lucide-react';
 
 import Header from '@/components/layout/Header';
@@ -138,9 +139,10 @@ export default function DashboardPage() {
           <StaggerContainer className="flex flex-col gap-4" staggerDelay={0.06}>
             {/* ── Balance Card (full width) ─────────────────────────────────── */}
             <BalanceCard
-              availableBudget={budget?.availableBudget ?? 0}
+              availableBalance={budget?.availableBalance ?? 0}
               totalSpent={budget?.totalSpent ?? 0}
               totalBudget={budget?.totalBudget ?? 0}
+              budgetHorizon={budget?.budgetHorizon ?? null}
             />
 
             {/* ── Half-width row: DailyLimit + VaultPreview ─────────────────── */}
@@ -149,6 +151,7 @@ export default function DashboardPage() {
                 dailyLimit={Math.round(budget?.dailyLimit ?? 0)}
                 weeklyBudget={Math.round(budget?.weeklyBudget ?? 0)}
                 burnStatus={budget?.burnStatus ?? 'safe'}
+                todayRemaining={Math.round(budget?.todayRemaining ?? 0)}
                 daysUntilBroke={budget?.daysUntilBroke ?? null}
               />
 
@@ -157,6 +160,18 @@ export default function DashboardPage() {
                 targetAmount={vault?.targetAmount ?? null}
               />
             </div>
+
+            {/* ── Budget period context line ──────────────────────────────── */}
+            {budget?.budgetHorizon && (
+              <p
+                className="text-xs text-center -mt-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Budget period: {format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'MMM d')}
+                {' → '}
+                {format(budget.budgetHorizon, 'MMM d')}
+              </p>
+            )}
 
             {/* ── Subscription Alert (conditional — renders null if empty) ──── */}
             <SubscriptionAlert
@@ -203,6 +218,7 @@ function DashboardSkeleton() {
         <Skeleton.Amount width="65%" />
         <Skeleton.Line width="100%" height="6px" />
         <Skeleton.Line width="55%" height="14px" />
+        <Skeleton.Line width="45%" height="12px" />
       </div>
 
       {/* Half-width row skeleton */}

@@ -1,30 +1,117 @@
 // ============================================================
-// KHARCHA — Daily Spending Limit & Budget Calculator
-// Section 7.1 of KHARCHA_MASTER_PROJECT_DOCUMENT.md
+// KHARCHA — Continuous-Balance Budget Calculator
 //
-// Core budget engine for the dashboard. Computes:
-//   - Available budget after expenses & upcoming subscriptions
-//   - Smart daily limit with weekend 1.3x multiplier
-//   - Burn rate with safe / caution / danger classification
-//   - Month-end spending projection
-//   - Days-until-broke countdown
-//   - Weekly budget rollup
+// Unlike a traditional monthly budget that resets each month,
+// this algorithm treats all income as ONE continuous pool and
+// stretches spending to the END of the furthest month the user
+// has received allowance for (the "budget horizon").
+//
+// Example:
+//   - Feb 1: Dad sends ₹12,000 (target_month: "2026-02")
+//   - Feb 20: Dad sends ₹12,000 for March (target_month: "2026-03")
+//   - Horizon jumps from Feb 28 → Mar 31 automatically
+//   - Daily limit recalculates across the longer window
+//
+// Key formulas:
+//   availableBalance = totalIncome − totalExpenses − expectedSubscriptions
+//   daysRemaining    = days from today → last day of horizon (inclusive)
+//   dailyLimit       = availableBalance / daysRemaining × weekend multiplier
+//   burnRate         = totalExpenses / idealSpentByNow
 //
 // Usage:
 //   const result = calculateBudget({
-//     totalAllowance: 15000,
-//     totalBonus: 2000,
+//     totalIncome: 24000,
 //     totalExpenses: 4200,
+//     todayExpenses: 350,
 //     expectedSubscriptions: 800,
-//     dayOfMonth: 12,
-//     daysInMonth: 30,
+//     latestTargetMonth: '2026-03',
 //     isWeekend: true,
 //   });
-//   // result.dailyLimit → ₹665  (with weekend boost)
+//   // result.dailyLimit → ₹793 (with weekend boost)
 //   // result.burnStatus → 'safe'
 // ============================================================
 
-import type { BudgetState, BudgetResult, BurnStatus } from '@/types';
+// ─── Types ──────────────────────────────────────────────────────────────────────
+
+export type BurnStatus = 'safe' | 'caution' | 'danger';
+
+/**
+ * Input to the budget calculator.
+ *
+ * All monetary values are in INR (decrypted). The caller is responsible
+ * for decrypting amounts before passing them here.
+ */
+export interface BudgetInput {
+  /** Sum of ALL allowance + bonus income (excludes pass-through, emergency_fund) */
+  totalIncome: number;
+
+  /** Sum of ALL expenses to date (excludes pass-through) */
+  totalExpenses: number;
+
+  /** Amount spent today specifically — used for todayRemaining calculation */
+  todayExpenses: number;
+
+  /** Unpaid subscriptions expected to bill before the budget horizon */
+  expectedSubscriptions: number;
+
+  /**
+   * The furthest `target_month` from income_entries, e.g. "2026-03".
+   * Determines the budget horizon (last day of that month).
+   * If null, falls back to end of current month.
+   */
+  latestTargetMonth: string | null;
+
+  /** Whether today is Saturday or Sunday — weekends get a 30% spending boost */
+  isWeekend: boolean;
+}
+
+/**
+ * Complete budget calculation output for dashboard display.
+ *
+ * All monetary values are rounded to whole rupees.
+ */
+export interface BudgetResult {
+  /** Total money available right now (income − expenses − upcoming subscriptions, floored at 0) */
+  availableBalance: number;
+
+  /** Last day of the budget period — spending must last until this date */
+  budgetHorizon: Date;
+
+  /** Calendar days from today to budget horizon (inclusive, minimum 1) */
+  daysRemaining: number;
+
+  /**
+   * How much can be spent today.
+   * = availableBalance / daysRemaining, with weekend 1.3× multiplier, floored at ₹50.
+   */
+  dailyLimit: number;
+
+  /** dailyLimit × 7 — glanceable weekly number, capped at availableBalance */
+  weeklyBudget: number;
+
+  /**
+   * Spending pace relative to ideal linear consumption.
+   *   < 0.8  → safe (under-spending)
+   *   0.8–1.0 → caution (on track)
+   *   > 1.0  → danger (over-spending)
+   */
+  burnRate: number;
+
+  /** Categorical classification of burnRate */
+  burnStatus: BurnStatus;
+
+  /** Projected balance at horizon date if current avg daily spend continues */
+  projectedEndBalance: number;
+
+  /**
+   * Days until balance hits zero at current spending pace.
+   * null if pace is zero (no expenses yet) or if user will make it to horizon.
+   */
+  daysUntilBroke: number | null;
+
+  /** dailyLimit − todayExpenses, floored at 0 */
+  todayRemaining: number;
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -38,23 +125,19 @@ const WEEKEND_MULTIPLIER = 1.3;
 const BURN_RATE_SAFE_UPPER = 0.8;
 const BURN_RATE_CAUTION_UPPER = 1.0;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
+/** Milliseconds in one day */
+const MS_PER_DAY = 86_400_000;
 
-/**
- * Clamp a value between min and max (inclusive).
- */
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
  * Determine burn status from a burn rate ratio.
  *
- * | Ratio Range | Status    | Meaning                               |
- * |-------------|-----------|---------------------------------------|
- * | < 0.8       | safe      | Spending below ideal pace (sage)      |
- * | 0.8 – 1.0   | caution   | On track or slightly over (amber)     |
- * | > 1.0       | danger    | Overspending relative to time (brick) |
+ * | Ratio Range | Status  | Meaning                                |
+ * |-------------|---------|----------------------------------------|
+ * | < 0.8       | safe    | Spending below ideal pace (sage)       |
+ * | 0.8 – 1.0   | caution | On track or slightly over (amber)      |
+ * | > 1.0       | danger  | Overspending relative to time (brick)  |
  */
 function deriveBurnStatus(burnRate: number): BurnStatus {
   if (burnRate < BURN_RATE_SAFE_UPPER) return 'safe';
@@ -62,240 +145,270 @@ function deriveBurnStatus(burnRate: number): BurnStatus {
   return 'danger';
 }
 
+/**
+ * Get the start date of the current budget period.
+ *
+ * For simplicity, this returns the 1st of the current calendar month.
+ * The budget period runs from this date through the budget horizon.
+ *
+ * Examples:
+ *   - Feb allowance only → period: Feb 1 – Feb 28
+ *   - Feb + March allowance → period: Feb 1 – Mar 31
+ *   - Called on Feb 15 → always returns Feb 1
+ *
+ * @param _latestTargetMonth - Currently unused; reserved for future
+ *   multi-month start detection (e.g., if user starts mid-month)
+ * @returns Date object set to midnight on the 1st of the current month
+ */
+export function getHorizonStartDate(_latestTargetMonth: string | null): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/**
+ * Parse a "YYYY-MM" string into the last day of that month.
+ *
+ * Uses the `new Date(year, month, 0)` trick:
+ *   "2026-03" → new Date(2026, 3, 0) → March 31, 2026
+ *
+ * @param ym - A string in "YYYY-MM" format
+ * @returns Date set to the last day of the specified month at 23:59:59.999
+ */
+function lastDayOfMonth(ym: string): Date {
+  const [year, month] = ym.split('-').map(Number);
+  const d = new Date(year, month, 0); // day 0 of next month = last day of `month`
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 // ─── Main Algorithm ─────────────────────────────────────────────────────────────
 
 /**
- * Calculate the complete budget picture for the current month.
+ * Calculate the complete budget picture using the continuous-balance model.
  *
  * ## Algorithm
  *
  * ```
- * totalBudget         = totalAllowance + totalBonus
- * available           = totalBudget − totalExpenses − expectedSubscriptions
- * daysRemaining       = daysInMonth − dayOfMonth + 1  (including today)
- * dailyLimit          = available / daysRemaining
- *                       × 1.3 if weekend
- *                       floor ₹50
+ * 1. HORIZON
+ *    horizonDate        = last day of latestTargetMonth (or current month)
  *
- * idealSpentByNow     = totalBudget × (dayOfMonth / daysInMonth)
- * burnRate            = totalExpenses / idealSpentByNow
+ * 2. DAYS
+ *    daysRemaining      = ceil((horizon - today) / MS_PER_DAY), min 1
+ *    daysElapsed        = ceil((today - periodStart) / MS_PER_DAY), min 1
+ *    totalDays          = daysElapsed + daysRemaining - 1
  *
- * avgDailySpend       = totalExpenses / daysElapsed
- * projectedTotal      = avgDailySpend × daysInMonth
- * projectedMonthEnd   = totalBudget − projectedTotal
- * daysUntilBroke      = available / avgDailySpend  (null if won't run out)
- * weeklyBudget        = dailyLimit × 7
+ * 3. BALANCE
+ *    availableBalance   = max(0, totalIncome - totalExpenses - expectedSubscriptions)
+ *
+ * 4. DAILY LIMIT
+ *    dailyLimit         = availableBalance / daysRemaining
+ *                         × 1.3 if weekend
+ *                         floor ₹50
+ *
+ * 5. BURN RATE
+ *    idealSpentByNow    = totalIncome × (daysElapsed / totalDays)
+ *    burnRate           = totalExpenses / idealSpentByNow
+ *
+ * 6. PROJECTIONS
+ *    avgDailySpend      = totalExpenses / daysElapsed
+ *    projectedEndBalance = availableBalance - (avgDailySpend × daysRemaining)
+ *    daysUntilBroke     = floor(availableBalance / avgDailySpend)
+ *
+ * 7. TODAY
+ *    todayRemaining     = max(0, dailyLimit - todayExpenses)
  * ```
  *
  * ## Edge Cases
- * - **Zero income**: Returns floor daily limit (₹50), burn rate 0, status 'safe'
- * - **First day of month**: daysElapsed = 1, full budget available
- * - **Last day of month**: daysRemaining = 1, all remaining budget is today's limit
- * - **Overspent (negative available)**: available clamped to 0, daily limit = ₹50 floor
- * - **No expenses yet**: avgDailySpend = 0, daysUntilBroke = null (won't run out)
+ * - **No target_month**: Falls back to end of current month
+ * - **Zero income**: dailyLimit = ₹50 floor, burnRate = 0, status 'safe'
+ * - **First day**: daysElapsed = 1, full budget available
+ * - **Last day of horizon**: daysRemaining = 1, all remaining is today's limit
+ * - **Overspent**: availableBalance clamped to 0, dailyLimit = ₹50 floor
+ * - **No expenses**: avgDailySpend = 0, daysUntilBroke = null
+ * - **Horizon in the past**: daysRemaining = 1 (clamp), triggers danger burn
  *
- * @param state - Current month's budget state (all amounts in INR, decrypted)
+ * @param input - Current budget state (all amounts in INR, decrypted)
  * @returns Computed budget metrics for dashboard display
  *
  * @example
  * ```ts
- * // Mid-month, weekday
+ * // Mid-month, March allowance received, weekday
  * calculateBudget({
- *   totalAllowance: 15000,
- *   totalBonus: 0,
+ *   totalIncome: 24000,
  *   totalExpenses: 6000,
+ *   todayExpenses: 200,
  *   expectedSubscriptions: 500,
- *   dayOfMonth: 15,
- *   daysInMonth: 30,
+ *   latestTargetMonth: '2026-03',
  *   isWeekend: false,
  * });
- * // → { availableBudget: 8500, dailyLimit: 531, burnRate: 0.80, burnStatus: 'caution', ... }
+ * // → { availableBalance: 17500, dailyLimit: ~449, burnStatus: 'safe', ... }
  * ```
  */
-export function calculateBudget(state: BudgetState): BudgetResult {
+export function calculateBudget(input: BudgetInput): BudgetResult {
   const {
-    totalAllowance,
-    totalBonus,
+    totalIncome,
     totalExpenses,
+    todayExpenses,
     expectedSubscriptions,
-    dayOfMonth,
-    daysInMonth,
+    latestTargetMonth,
     isWeekend,
-  } = state;
+  } = input;
 
-  // ── Derived values ──────────────────────────────────────────────────────────
+  // ── 1. Determine budget horizon ─────────────────────────────────────────────
+  // End of the latest target month, or end of current month as fallback.
 
-  const totalBudget = totalAllowance + totalBonus;
-  const available = totalBudget - totalExpenses - expectedSubscriptions;
+  let budgetHorizon: Date;
+  if (latestTargetMonth) {
+    budgetHorizon = lastDayOfMonth(latestTargetMonth);
+  } else {
+    const now = new Date();
+    budgetHorizon = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    budgetHorizon.setHours(23, 59, 59, 999);
+  }
 
-  // Days remaining including today; clamp to at least 1 to avoid division by zero
-  const daysRemaining = Math.max(daysInMonth - dayOfMonth + 1, 1);
+  // ── 2. Calculate day counts ─────────────────────────────────────────────────
 
-  // Days elapsed; on day 1 this is 1 (you've "started" the first day)
-  const daysElapsed = clamp(dayOfMonth, 1, daysInMonth);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  // ── Daily limit ─────────────────────────────────────────────────────────────
-  // Base: spread remaining budget evenly across remaining days
-  // Weekend boost: college student spends more on Sat/Sun (outings, food)
-  // Floor: always at least ₹50 so user isn't locked out of basic purchases
+  // Days from today to horizon (inclusive of both today and horizon day)
+  const daysRemaining = Math.max(
+    1,
+    Math.ceil((budgetHorizon.getTime() - today.getTime()) / MS_PER_DAY),
+  );
 
-  let dailyLimit = available / daysRemaining;
+  // Days elapsed since the budget period started (1st of current month)
+  const periodStart = getHorizonStartDate(latestTargetMonth);
+  const daysElapsed = Math.max(
+    1,
+    Math.ceil((today.getTime() - periodStart.getTime()) / MS_PER_DAY) + 1, // +1: day 1 = first day
+  );
+
+  // Total days in the budget period
+  const totalDays = daysElapsed + daysRemaining - 1; // -1: today counted in both
+
+  // ── 3. Available balance ────────────────────────────────────────────────────
+  // Subtract upcoming subscriptions — they're committed spending.
+
+  const availableBalance = Math.max(
+    0,
+    totalIncome - totalExpenses - expectedSubscriptions,
+  );
+
+  // ── 4. Daily limit ──────────────────────────────────────────────────────────
+  // Spread remaining balance evenly, boost on weekends, enforce floor.
+
+  let dailyLimit = availableBalance / daysRemaining;
 
   if (isWeekend) {
     dailyLimit *= WEEKEND_MULTIPLIER;
   }
 
-  // Enforce minimum floor — even when budget is negative/zero,
-  // user should see ₹50 (with a danger burn status to warn them)
   dailyLimit = Math.max(dailyLimit, DAILY_LIMIT_FLOOR);
 
-  // ── Burn rate ───────────────────────────────────────────────────────────────
-  // How fast are we spending relative to an ideal linear pace?
-  //   idealSpentByNow = totalBudget × (dayOfMonth / daysInMonth)
+  // ── 5. Burn rate ────────────────────────────────────────────────────────────
+  // How fast are we spending vs an ideal linear pace across the full period?
+  //
+  //   idealSpentByNow = totalIncome × (daysElapsed / totalDays)
   //   burnRate = actualSpent / idealSpent
   //
-  // Edge: zero income → idealSpentByNow is 0 → burnRate defaults to 0 (safe)
-  //        This makes sense: if you have no budget, no spending is expected.
+  // Zero income → burnRate = 0 (safe). No spending expected with no budget.
 
-  const idealSpentByNow = totalBudget * (daysElapsed / daysInMonth);
+  const idealSpentByNow = totalIncome * (daysElapsed / totalDays);
   const burnRate = idealSpentByNow > 0
     ? totalExpenses / idealSpentByNow
     : 0;
   const burnStatus = deriveBurnStatus(burnRate);
 
-  // ── Month-end projection ────────────────────────────────────────────────────
-  // Project forward: if user keeps spending at current avg, what's left at month end?
-  //
-  // Edge: first day with no expenses → avgDailySpend = 0 → projectedTotal = 0
-  //        → projectedMonthEnd = totalBudget (full budget remaining, which is correct)
+  // ── 6. Projections ──────────────────────────────────────────────────────────
+  // If user keeps spending at current avg daily rate, what's left at horizon?
 
   const avgDailySpend = daysElapsed > 0
     ? totalExpenses / daysElapsed
     : 0;
-  const projectedTotal = avgDailySpend * daysInMonth;
-  const projectedMonthEnd = totalBudget - projectedTotal;
 
-  // ── Days until broke ────────────────────────────────────────────────────────
-  // At current spending pace, how many days until available balance hits zero?
-  //
-  // Returns null when:
-  //   - No expenses yet (avgDailySpend = 0) → user won't run out at current pace
-  //   - Projected broke date is AFTER month end → user will make it through
-  //   - Available is negative → user is already "broke" (daysUntilBroke = 0 shown via clamp)
+  const projectedEndBalance = availableBalance - (avgDailySpend * daysRemaining);
 
+  // Days until balance hits zero at current pace.
+  // null when: no expenses yet, or user will make it to horizon.
   let daysUntilBroke: number | null = null;
 
   if (avgDailySpend > 0) {
-    const rawDaysUntilBroke = Math.floor(available / avgDailySpend);
-
-    if (available <= 0) {
-      // Already overspent — 0 days until broke
+    if (availableBalance <= 0) {
       daysUntilBroke = 0;
-    } else if (rawDaysUntilBroke < daysRemaining) {
-      // Will run out before month ends — surface the warning
-      daysUntilBroke = rawDaysUntilBroke;
+    } else {
+      const raw = Math.floor(availableBalance / avgDailySpend);
+      if (raw < daysRemaining) {
+        daysUntilBroke = raw;
+      }
+      // else: will make it to horizon → null (no warning)
     }
-    // else: will make it through the month → null (no warning needed)
   }
 
-  // ── Weekly budget ───────────────────────────────────────────────────────────
-  // Simple 7× daily limit for a glanceable weekly number.
-  // Uses the adjusted daily limit (with weekend multiplier if applicable).
+  // ── 7. Today remaining ──────────────────────────────────────────────────────
 
-  const weeklyBudget = Math.round(Math.min(dailyLimit * 7, Math.max(available, 0)));
+  const todayRemaining = Math.max(0, dailyLimit - todayExpenses);
+
+  // ── 8. Weekly budget ────────────────────────────────────────────────────────
+  // Capped at available balance so it never exceeds what's actually there.
+
+  const weeklyBudget = Math.round(
+    Math.min(dailyLimit * 7, availableBalance),
+  );
 
   // ── Return ──────────────────────────────────────────────────────────────────
 
   return {
-    availableBudget: Math.max(Math.round(available), 0),
+    availableBalance: Math.round(availableBalance),
+    budgetHorizon,
+    daysRemaining,
     dailyLimit: Math.round(dailyLimit),
+    weeklyBudget,
     burnRate: Math.round(burnRate * 100) / 100,
     burnStatus,
-    projectedMonthEnd: Math.round(projectedMonthEnd),
+    projectedEndBalance: Math.round(projectedEndBalance),
     daysUntilBroke,
-    weeklyBudget,
+    todayRemaining: Math.round(todayRemaining),
   };
 }
 
-// ─── Convenience Builders ───────────────────────────────────────────────────────
+// ─── Convenience ────────────────────────────────────────────────────────────────
 
 /**
- * Build a `BudgetState` from raw values + a Date, deriving day-of-month
- * fields and weekend status automatically.
+ * Build a `BudgetInput` from raw financial data, auto-detecting
+ * weekend status from the current date.
  *
- * Useful when calling from server actions or hooks where you have a Date
- * object rather than pre-computed day fields.
- *
- * @param params - Financial data for the current month
- * @param date   - The reference date (defaults to now)
- * @returns A fully populated BudgetState ready for `calculateBudget`
- *
- * @example
- * ```ts
- * const state = buildBudgetState({
- *   totalAllowance: 15000,
- *   totalBonus: 2000,
- *   totalExpenses: 4200,
- *   expectedSubscriptions: 800,
- * });
- * const result = calculateBudget(state);
- * ```
+ * @param params - Financial data (decrypted amounts in INR)
+ * @returns A fully populated BudgetInput ready for `calculateBudget`
  */
-export function buildBudgetState(
-  params: {
-    totalAllowance: number;
-    totalBonus: number;
-    totalExpenses: number;
-    expectedSubscriptions: number;
-  },
+export function buildBudgetInput(
+  params: Omit<BudgetInput, 'isWeekend'>,
   date: Date = new Date(),
-): BudgetState {
-  const dayOfMonth = date.getDate();
-  const year = date.getFullYear();
-  const month = date.getMonth();
-
-  // Total days in this calendar month
-  // new Date(year, month + 1, 0).getDate() gives last day of current month
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Saturday (6) or Sunday (0)
+): BudgetInput {
   const dayOfWeek = date.getDay();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
   return {
     ...params,
-    dayOfMonth,
-    daysInMonth,
-    isWeekend,
+    isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
   };
 }
 
 /**
- * Create an empty/zero budget state for a given date.
- *
- * Useful as a default/fallback when data hasn't loaded yet,
- * or for the very start of a month with no income entries.
- *
- * @param date - The reference date (defaults to now)
- * @returns A BudgetState with all financial values set to 0
+ * Create a zero-state BudgetInput — useful as a loading/fallback default.
  */
-export function emptyBudgetState(date: Date = new Date()): BudgetState {
-  return buildBudgetState(
-    {
-      totalAllowance: 0,
-      totalBonus: 0,
-      totalExpenses: 0,
-      expectedSubscriptions: 0,
-    },
-    date,
-  );
+export function emptyBudgetInput(): BudgetInput {
+  const dayOfWeek = new Date().getDay();
+  return {
+    totalIncome: 0,
+    totalExpenses: 0,
+    todayExpenses: 0,
+    expectedSubscriptions: 0,
+    latestTargetMonth: null,
+    isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+  };
 }
 
 /**
  * Format a BurnStatus into a human-readable label for the UI.
- *
- * @param status - The burn status classification
- * @returns A display-friendly label string
  */
 export function burnStatusLabel(status: BurnStatus): string {
   switch (status) {
@@ -309,17 +422,14 @@ export function burnStatusLabel(status: BurnStatus): string {
 }
 
 /**
- * Get the CSS variable color name for a given burn status.
+ * Get the CSS variable name for a given burn status.
  * Maps to the Slate & Parchment design system color tokens.
  *
- * | Status  | CSS Variable     | Color          |
- * |---------|------------------|----------------|
- * | safe    | --color-income   | Sage Moss      |
- * | caution | --color-accent   | Aged Bronze    |
- * | danger  | --color-expense  | Terracotta     |
- *
- * @param status - The burn status classification
- * @returns CSS variable name (without `var()` wrapper)
+ * | Status  | CSS Variable    | Color       |
+ * |---------|-----------------|-------------|
+ * | safe    | --color-income  | Sage Moss   |
+ * | caution | --color-accent  | Aged Bronze |
+ * | danger  | --color-expense | Terracotta  |
  */
 export function burnStatusColor(status: BurnStatus): string {
   switch (status) {
@@ -331,7 +441,3 @@ export function burnStatusColor(status: BurnStatus): string {
       return '--color-expense';
   }
 }
-
-// ─── Re-export types for convenience ────────────────────────────────────────────
-
-export type { BudgetState, BudgetResult, BurnStatus };

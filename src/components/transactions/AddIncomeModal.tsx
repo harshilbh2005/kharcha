@@ -13,9 +13,9 @@
 //   3. Pass VaultUpdatePayload to useCreateIncome mutation
 // ============================================================
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
+import { format, addMonths, subMonths, lastDayOfMonth } from 'date-fns';
 import {
   Wallet, Shield, Gift, ArrowRightLeft,
   RefreshCw, MoreHorizontal,
@@ -197,6 +197,91 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ── Target month helpers ─────────────────────────────────────────────────────
+
+/** Types that show the target month picker */
+const TARGET_MONTH_TYPES: IncomeType[] = ['allowance', 'festival_bonus'];
+
+/** Format a Date to "YYYY-MM" */
+function toYYYYMM(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Format a Date to a short label like "Feb 2026" */
+function toMonthLabel(d: Date): string {
+  return format(d, 'MMM yyyy');
+}
+
+/** Get the smart default target month based on day of month */
+function getDefaultTargetMonth(): string {
+  const now = new Date();
+  // Day 20-31: allowance is likely for next month
+  return now.getDate() >= 20 ? toYYYYMM(addMonths(now, 1)) : toYYYYMM(now);
+}
+
+interface MonthOption {
+  label: string;
+  value: string; // "YYYY-MM"
+  endDate: string; // Human-readable end date for helper text
+}
+
+function getMonthOptions(): MonthOption[] {
+  const now = new Date();
+  const prev = subMonths(now, 1);
+  const next = addMonths(now, 1);
+  return [prev, now, next].map((d) => ({
+    label: toMonthLabel(d),
+    value: toYYYYMM(d),
+    endDate: format(lastDayOfMonth(d), 'MMM d'),
+  }));
+}
+
+// ── TargetMonthPicker ────────────────────────────────────────────────────────
+
+interface TargetMonthPickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function TargetMonthPicker({ value, onChange, disabled }: TargetMonthPickerProps) {
+  const options = useMemo(getMonthOptions, []);
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div>
+      <SectionLabel>THIS ALLOWANCE IS FOR</SectionLabel>
+      <div className="flex gap-2">
+        {options.map((opt) => {
+          const isActive = opt.value === value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(opt.value)}
+              className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: isActive ? 'var(--color-accent)' : 'var(--bg-surface)',
+                color: isActive ? '#FFFFFF' : 'var(--text-primary)',
+                border: `1px solid ${isActive ? 'var(--color-accent)' : 'var(--border-default)'}`,
+                opacity: disabled ? 0.5 : 1,
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {selected && (
+        <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+          Budget runs through {selected.endDate}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── AddIncomeModal ────────────────────────────────────────────────────────────
 
 export interface AddIncomeModalProps {
@@ -212,6 +297,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
   const [passThroughFor, setPassThroughFor] = useState('');
   const [date, setDate] = useState(todayISO);
   const [showDateInput, setShowDateInput] = useState(false);
+  const [targetMonth, setTargetMonth] = useState(getDefaultTargetMonth);
 
   // ── Validation errors ───────────────────────────────────────────────────────
   const [amountError, setAmountError] = useState('');
@@ -233,6 +319,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
     setPassThroughFor('');
     setDate(todayISO());
     setShowDateInput(false);
+    setTargetMonth(getDefaultTargetMonth());
     setAmountError('');
     setDescError('');
   }, [isOpen]);
@@ -303,6 +390,9 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
               ? passThroughFor.trim()
               : undefined,
           date,
+          target_month: TARGET_MONTH_TYPES.includes(incomeType)
+            ? targetMonth
+            : null,
         },
         vaultPayload,
       });
@@ -382,7 +472,26 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
           )}
         </div>
 
-        {/* ── 3. Description ────────────────────────────────────────────────── */}
+        {/* ── 3. Target month (allowance / festival_bonus only) ─────────── */}
+        <AnimatePresence>
+          {TARGET_MONTH_TYPES.includes(incomeType) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <TargetMonthPicker
+                value={targetMonth}
+                onChange={setTargetMonth}
+                disabled={isLoading}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── 4. Description ────────────────────────────────────────────────── */}
         <div>
           <input
             type="text"
@@ -413,7 +522,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
           )}
         </div>
 
-        {/* ── 4. Pass-through label (conditional) ─────────────────────────── */}
+        {/* ── 5. Pass-through label (conditional) ─────────────────────────── */}
         <AnimatePresence>
           {incomeType === 'pass_through' && (
             <motion.div
@@ -445,7 +554,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
           )}
         </AnimatePresence>
 
-        {/* ── 5. Date ───────────────────────────────────────────────────────── */}
+        {/* ── 6. Date ───────────────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between">
             <div>
@@ -485,7 +594,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
           )}
         </div>
 
-        {/* ── 6. Save button ────────────────────────────────────────────────── */}
+        {/* ── 7. Save button ────────────────────────────────────────────────── */}
         <div className="pt-1">
           <Button
             onClick={handleSave}

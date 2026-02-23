@@ -15,7 +15,9 @@ export interface DailyLimitCardProps {
   weeklyBudget: number;
   /** Burn rate status classification */
   burnStatus: BurnStatus;
-  /** Days until budget runs out — null if user will make it through the month */
+  /** How much of today's daily limit is still unspent (₹) */
+  todayRemaining: number;
+  /** Days until budget runs out — null if user will make it to horizon */
   daysUntilBroke: number | null;
   /** Reference date for the "₹0 by <date>" warning (defaults to today) */
   today?: Date;
@@ -54,23 +56,20 @@ function formatINR(amount: number): string {
   }).format(Math.abs(amount));
 }
 
-/**
- * Given a reference date + days offset, returns a short "Mon DD" date string.
- * e.g. "Feb 25" or "Mar 3"
- */
 function futureDateLabel(today: Date, daysFromNow: number): string {
   return format(addDays(today, daysFromNow), 'd MMM');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 //
-// Half-width card showing today's spending limit and burn rate.
+// Half-width card showing today's spending limit, burn rate, and remaining.
 //
 // Layout:
 //   ┌──────────────────────┐
 //   │  Today's Limit       │
-//   │  ₹535 / day          │
+//   │  ₹535                │
 //   │  🟢 On track         │
+//   │  ₹285 left today     │
 //   │  ₹4,200 / week       │
 //   │  ⚠️ ₹0 by Feb 25     │  ← only if daysUntilBroke !== null
 //   └──────────────────────┘
@@ -79,6 +78,7 @@ export function DailyLimitCard({
   dailyLimit,
   weeklyBudget,
   burnStatus,
+  todayRemaining,
   daysUntilBroke,
   today = new Date(),
   delay = 0,
@@ -101,17 +101,10 @@ export function DailyLimitCard({
       {/* ── Daily limit headline ───────────────────────────────────────────── */}
       <p className="font-display text-2xl leading-tight" style={{ color: 'var(--text-primary)' }}>
         ₹{formatINR(dailyLimit)}
-        <span
-          className="font-body text-sm ml-1"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          / day
-        </span>
       </p>
 
       {/* ── Burn rate indicator ────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 mt-2">
-        {/* Animated dot */}
         <motion.span
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -137,9 +130,20 @@ export function DailyLimitCard({
         </span>
       </div>
 
-      {/* ── Weekly budget ──────────────────────────────────────────────────── */}
+      {/* ── Today remaining ─────────────────────────────────────────────── */}
       <p
         className="font-body text-sm mt-2"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        <span className="font-mono" style={{ color: todayRemaining > 0 ? 'var(--color-income)' : 'var(--color-expense)' }}>
+          ₹{formatINR(todayRemaining)}
+        </span>
+        {' left today'}
+      </p>
+
+      {/* ── Weekly budget ──────────────────────────────────────────────────── */}
+      <p
+        className="font-body text-xs mt-1"
         style={{ color: 'var(--text-secondary)' }}
       >
         <span className="font-mono">₹{formatINR(weeklyBudget)}</span>

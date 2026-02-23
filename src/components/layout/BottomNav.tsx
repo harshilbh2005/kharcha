@@ -1,13 +1,21 @@
 "use client";
 
+// ============================================================
+// KHARCHA — BottomNav
+//
+// Fixed bottom navigation bar.  Four tab items (Home, Transactions,
+// Vault, Settings) arranged left / right with a passive spacer in the
+// centre that visually reserves room for the floating FABMenu button
+// (rendered separately in BottomNavWrapper and positioned via CSS
+// fixed so it floats above the bar at the same visual centre).
+// ============================================================
+
 import { motion } from "framer-motion";
-import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ArrowLeftRight,
-  Plus,
   Shield,
   Settings,
   type LucideIcon,
@@ -21,7 +29,7 @@ interface TabDef {
   path: string;
 }
 
-// Split into left / right so the centre Add button sits between them
+// Split into left / right so the passive FAB spacer sits between them
 const LEFT_TABS: TabDef[] = [
   { icon: LayoutDashboard, label: "Home",         path: "/"             },
   { icon: ArrowLeftRight,  label: "Transactions", path: "/transactions" },
@@ -91,71 +99,12 @@ function NavTabItem({ tab, active }: { tab: TabDef; active: boolean }) {
   );
 }
 
-// ─── AddButton ─────────────────────────────────────────────────────────────────
-
-/** Origin: center coordinates of the FAB for the InkSpread animation. */
-export type FabOrigin = { x: number; y: number };
-
-function AddButton({ onPress }: { onPress?: (origin: FabOrigin) => void }) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  const handleClick = () => {
-    const rect = btnRef.current?.getBoundingClientRect();
-    const origin: FabOrigin = rect
-      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-      : { x: window.innerWidth / 2, y: window.innerHeight - 52 }; // fallback
-    onPress?.(origin);
-  };
-
-  return (
-    // Wrapper keeps the button centred inside its flex-1 slot
-    <div
-      className="flex flex-col items-center justify-center flex-1"
-      style={{ minWidth: 44 }}
-    >
-      <motion.button
-        ref={btnRef}
-        onClick={handleClick}
-        // Continuous 2 px vertical oscillation — the "floating FAB" feel
-        animate={{ y: [0, -2, 0] }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        whileTap={{ scale: 0.92 }}
-        aria-label="Add expense"
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: "50%",
-          backgroundColor: "var(--color-accent)",
-          color: "#ffffff",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          // Warm bronze-tinted shadow matching --color-accent
-          boxShadow:
-            "var(--shadow-float, 0 4px 20px rgba(139,115,85,0.30), 0 1px 6px rgba(0,0,0,0.10))",
-        }}
-      >
-        <Plus size={22} strokeWidth={2.5} />
-      </motion.button>
-    </div>
-  );
-}
-
 // ─── BottomNav ─────────────────────────────────────────────────────────────────
+//
+// No longer accepts onAddPress — the FABMenu component handles its own
+// open / close logic and is rendered as a sibling in BottomNavWrapper.
 
-export interface BottomNavProps {
-  /** Called with the FAB's center coordinates when the Add button is pressed. */
-  onAddPress?: (origin: FabOrigin) => void;
-}
-
-export function BottomNav({ onAddPress }: BottomNavProps) {
+export function BottomNav() {
   const pathname = usePathname();
 
   return (
@@ -184,8 +133,13 @@ export function BottomNav({ onAddPress }: BottomNavProps) {
         <NavTabItem key={tab.path} tab={tab} active={isActive(pathname, tab.path)} />
       ))}
 
-      {/* Centre: Add expense FAB */}
-      <AddButton onPress={onAddPress} />
+      {/* Centre: passive spacer — the real FAB button is rendered in FABMenu
+          (position:fixed, z-52) so it floats at the same visual centre above
+          this nav bar without being constrained by its stacking context. */}
+      <div
+        aria-hidden="true"
+        style={{ flex: 1, minWidth: 44, height: 48 }}
+      />
 
       {/* Right: Vault + Settings */}
       {RIGHT_TABS.map((tab) => (

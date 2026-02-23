@@ -132,6 +132,7 @@ export const createIncomeSchema = z.object({
   description: z.string().trim().max(200).optional(),
   pass_through_for: z.string().trim().max(200).optional(),
   date: dateField.optional(),
+  target_month: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-MM').nullable().optional(),
 }).strict();
 
 export type CreateIncomeInput = z.infer<typeof createIncomeSchema>;

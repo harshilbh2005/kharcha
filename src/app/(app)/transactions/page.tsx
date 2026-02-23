@@ -89,6 +89,7 @@ function mapIncomeToDecrypted(
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     amount, // positive → displayed as income (sage green)
+    target_month: entry.target_month ?? null,
   };
 }
 
