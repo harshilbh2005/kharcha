@@ -13,7 +13,8 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createTransactionSchema, updateTransactionSchema } from '@/lib/validations';
 import type { CreateTransactionInput } from '@/lib/validations';
-import type { Transaction, SubscriptionMatchResult } from '@/types';
+import type { Transaction, SubscriptionMatchResult, NotificationCreate } from '@/types';
+import { checkAnomaly, anomaliesToNotifications } from '@/lib/algorithms/anomaly-detector';
 
 // ============================================================
 // CONSTANTS
@@ -155,6 +156,42 @@ export async function createTransaction(
 
     // Subscription matching (Phase 6 stub — no-op for now)
     await matchTransaction(transaction as Transaction, profileId);
+
+    // ── Anomaly detection (Phase 7) ───────────────────────────────────────────
+    // Velocity check runs unconditionally (count-based, no decryption needed).
+    // Amount-based checks require plain_amount — not available here because
+    // amounts arrive pre-encrypted from the client.
+    void checkAnomaly({
+      profileId,
+      transactionId: (transaction as Transaction).id,
+      categoryId:    validated.category_id ?? null,
+      date:          validated.date ?? new Date().toISOString().slice(0, 10),
+      // plain_amount intentionally omitted — key never touches server
+    }).then(async (anomalies) => {
+      const notifications = anomaliesToNotifications(anomalies);
+      if (notifications.length === 0) return;
+
+      const supabaseInner = await createClient();
+      const rows: NotificationCreate[] = notifications.map((n) => ({
+        profile_id: profileId,
+        type:       'anomaly_detected',
+        title:      n.title,
+        message:    n.message,
+        is_read:    false,
+        action_url: '/transactions',
+      }));
+
+      const { error } = await supabaseInner
+        .from('notifications')
+        .insert(rows);
+
+      if (error) {
+        console.warn('[createTransaction] Failed to insert anomaly notifications:', error.message);
+      }
+    }).catch((err: unknown) => {
+      // Non-critical — never block the response
+      console.warn('[createTransaction] Anomaly detection error:', err);
+    });
 
     revalidateAll();
 

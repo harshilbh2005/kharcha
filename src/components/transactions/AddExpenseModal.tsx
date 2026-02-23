@@ -6,14 +6,17 @@
 //
 // Flow:
 //   1. Amount input (large, centered, auto-focus)
-//   2. Description
-//   3. Category picker
+//   2. Description  → debounce 500 ms → AI categorize
+//   3. Category picker  (auto-selected by AI, overridable)
 //   4. Need / Want toggle
 //   5. Date (optional)
 //   6. Save / Cancel
 //
-// On save: validate → encrypt → createTransaction → onClose
-// On error: keep modal open (toast shown by hook's onError)
+// AI suggestion:
+//   • Calls POST /api/ai/categorize after 500 ms of inactivity
+//   • Auto-selects matching category + ✦ AI suggested badge
+//   • User tap on a different category clears the badge and
+//     saves the correction to ai_learning on submit
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react';
@@ -27,6 +30,9 @@ import { useCreateTransaction } from '@/hooks/useTransactions';
 import { useBudget } from '@/hooks/useBudget';
 import { useEncryption } from '@/hooks/useEncryption';
 import { amountSchema } from '@/lib/validations';
+import { saveAiLearningOverride } from '@/app/actions/ai';
+import { extractMerchantKeyword } from '@/lib/ai/categorize';
+import type { CategorizationResult } from '@/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -77,24 +83,36 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpenseModalProps) {
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [amountStr, setAmountStr] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState<string | undefined>();
-  const [isNeed, setIsNeed] = useState(true);
-  const [date, setDate] = useState(todayISO);
+  const [amountStr, setAmountStr]         = useState('');
+  const [description, setDescription]     = useState('');
+  const [categoryId, setCategoryId]       = useState<string | undefined>();
+  const [isNeed, setIsNeed]               = useState(true);
+  const [date, setDate]                   = useState(todayISO);
   const [showDateInput, setShowDateInput] = useState(false);
 
   // ── Validation errors ───────────────────────────────────────────────────────
   const [amountError, setAmountError] = useState('');
-  const [descError, setDescError] = useState('');
+  const [descError, setDescError]     = useState('');
 
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  // ── AI suggestion state ─────────────────────────────────────────────────────
+  // aiSuggestion:          last successful response from /api/ai/categorize
+  // aiSuggestedCategoryId: category ID that was auto-selected by the AI
+  // aiLoading:             debounce timer is running or fetch is in-flight
+  const [aiSuggestion, setAiSuggestion]                   = useState<CategorizationResult | null>(null);
+  const [aiLoading, setAiLoading]                         = useState(false);
+  const [aiSuggestedCategoryId, setAiSuggestedCategoryId] = useState<string | undefined>();
+
+  // Ref instead of state so the debounce callback reads the latest value
+  // without needing to be listed as a dependency (avoids infinite loops).
+  const userManuallyPickedRef = useRef(false);
+  const aiDebounceRef         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const amountInputRef        = useRef<HTMLInputElement>(null);
 
   // ── Data / mutation hooks ───────────────────────────────────────────────────
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: budget } = useBudget();
-  const { encrypt } = useEncryption();
-  const mutation = useCreateTransaction();
+  const { encrypt }      = useEncryption();
+  const mutation         = useCreateTransaction();
 
   // ── Auto-focus amount after ink spread finishes (~420 ms) ──────────────────
   useEffect(() => {
@@ -105,8 +123,13 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
 
   // ── Reset / prefill form when modal opens or closes ─────────────────────────
   useEffect(() => {
+    // Always cancel any pending AI call when open state changes
+    if (aiDebounceRef.current) {
+      clearTimeout(aiDebounceRef.current);
+      aiDebounceRef.current = null;
+    }
+
     if (isOpen) {
-      // Apply prefill values (or defaults) when the modal opens
       setAmountStr(prefill?.amount != null ? String(prefill.amount) : '');
       setDescription(prefill?.description ?? prefill?.merchant ?? '');
       setDate(prefill?.date ?? todayISO());
@@ -115,8 +138,11 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
       setShowDateInput(false);
       setAmountError('');
       setDescError('');
+      setAiSuggestion(null);
+      setAiLoading(false);
+      setAiSuggestedCategoryId(undefined);
+      userManuallyPickedRef.current = false;
     } else {
-      // Full reset on close
       setAmountStr('');
       setDescription('');
       setCategoryId(undefined);
@@ -125,13 +151,16 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
       setShowDateInput(false);
       setAmountError('');
       setDescError('');
+      setAiSuggestion(null);
+      setAiLoading(false);
+      setAiSuggestedCategoryId(undefined);
+      userManuallyPickedRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // ── Amount input handler ────────────────────────────────────────────────────
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow digits and at most one decimal point
     const cleaned = e.target.value
       .replace(/[^0-9.]/g, '')
       .replace(/(\..*)\./g, '$1'); // drop extra dots
@@ -139,13 +168,80 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
     if (amountError) setAmountError('');
   };
 
+  // ── Description change → debounced AI categorization ───────────────────────
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDescription(value);
+    if (descError) setDescError('');
+
+    // Cancel any pending debounce timer
+    if (aiDebounceRef.current) {
+      clearTimeout(aiDebounceRef.current);
+      aiDebounceRef.current = null;
+    }
+
+    // Don't bother for very short inputs
+    if (value.trim().length < 3) {
+      setAiSuggestion(null);
+      setAiSuggestedCategoryId(undefined);
+      userManuallyPickedRef.current = false;
+      return;
+    }
+
+    // Snapshot amount NOW so the closure captures the right value
+    // (state may change in the 500 ms before the timer fires)
+    const snapshotAmount = amountStr;
+
+    aiDebounceRef.current = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch('/api/ai/categorize', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: value.trim(),
+            amount:      parseFloat(snapshotAmount) || 0,
+            currency:    'INR',
+          }),
+        });
+
+        if (!res.ok) return; // silently ignore rate-limit or server errors
+
+        const result = (await res.json()) as CategorizationResult;
+        setAiSuggestion(result);
+
+        // Auto-select category only when the user hasn't manually picked one
+        if (!userManuallyPickedRef.current) {
+          const match = categories.find(
+            (c) => c.name.toLowerCase() === result.category.toLowerCase(),
+          );
+          if (match) {
+            setCategoryId(match.id);
+            setAiSuggestedCategoryId(match.id);
+            setIsNeed(result.is_need);
+          }
+        }
+      } catch {
+        // Network error — AI suggestion is just a hint, fail silently
+      } finally {
+        setAiLoading(false);
+      }
+    }, 500);
+  };
+
+  // ── Category selection handler ──────────────────────────────────────────────
+  const handleCategorySelect = (id: string) => {
+    setCategoryId(id);
+    userManuallyPickedRef.current = true; // prevent AI from overriding back
+  };
+
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     let valid = true;
 
-    const parsed = amountSchema.safeParse(amountStr);
-    if (!parsed.success) {
-      setAmountError(parsed.error.issues[0].message);
+    const parsedAmount = amountSchema.safeParse(amountStr);
+    if (!parsedAmount.success) {
+      setAmountError(parsedAmount.error.issues[0].message);
       valid = false;
     } else {
       setAmountError('');
@@ -160,23 +256,43 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
 
     if (!valid) return;
 
+    // ── Persist AI learning override (fire-and-forget) ────────────────────────
+    // Conditions: AI suggested something, user picked a DIFFERENT category,
+    // and the original suggestion wasn't already a cache hit (Tier 1).
+    if (
+      aiSuggestion &&
+      aiSuggestion.source !== 'cache' &&
+      userManuallyPickedRef.current &&
+      categoryId &&
+      categoryId !== aiSuggestedCategoryId
+    ) {
+      const selectedCategory = categories.find((c) => c.id === categoryId);
+      if (selectedCategory) {
+        saveAiLearningOverride(
+          extractMerchantKeyword(description.trim()),
+          selectedCategory.name,
+          null,  // subcategory not exposed in the picker UI
+          isNeed,
+          aiSuggestion.category,
+        ).catch(() => {}); // non-blocking
+      }
+    }
+
     try {
       const { encrypted, hash } = await encrypt(parseFloat(amountStr));
       await mutation.mutateAsync({
         amount_encrypted: encrypted,
-        amount_hash: hash,
-        currency: 'INR',
-        description: description.trim(),
-        category_id: categoryId,
-        is_pass_through: false,
-        is_need: isNeed,
+        amount_hash:      hash,
+        currency:         'INR',
+        description:      description.trim(),
+        category_id:      categoryId,
+        is_pass_through:  false,
+        is_need:          isNeed,
         date,
       });
-      // mutateAsync resolves only on success — close the modal
       onClose();
     } catch {
-      // EncryptionError or network error.
-      // The hook's onError already shows an error toast; keep modal open.
+      // EncryptionError or network error — the hook's onError shows a toast
     }
   };
 
@@ -193,6 +309,21 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
       : 'var(--text-secondary)';
 
   const isLoading = mutation.isPending;
+
+  // AI sparkle badge: visible when AI auto-selected the current category
+  const showAiBadge =
+    !!aiSuggestion &&
+    !aiLoading &&
+    !!categoryId &&
+    categoryId === aiSuggestedCategoryId;
+
+  // Override note: user manually picked something different from AI
+  const showAiOverrideNote =
+    !!aiSuggestion &&
+    !aiLoading &&
+    userManuallyPickedRef.current &&
+    !!aiSuggestedCategoryId &&
+    categoryId !== aiSuggestedCategoryId;
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -233,7 +364,6 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
                 fontSize: '3rem',
                 lineHeight: 1,
                 color: amountStr ? 'var(--text-primary)' : 'var(--text-secondary)',
-                // Grow to fit content; ch ≈ digit width for display fonts
                 width: `${Math.max(1, (amountStr || '0').length) + 1}ch`,
                 minWidth: '4rem',
                 maxWidth: '14rem',
@@ -260,10 +390,7 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
           <input
             type="text"
             value={description}
-            onChange={(e) => {
-              setDescription(e.target.value);
-              if (descError) setDescError('');
-            }}
+            onChange={handleDescriptionChange}
             placeholder="What was it for?"
             disabled={isLoading}
             maxLength={200}
@@ -289,10 +416,49 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
         {/* ── 3. Category Picker ─────────────────────────────────────────────── */}
         {!categoriesLoading && categories.length > 0 && (
           <div className="mb-6">
-            <SectionLabel>CATEGORY</SectionLabel>
+            {/* Section header row — label + AI status */}
+            <div className="flex items-center gap-2 mb-3">
+              <p
+                className="text-xs font-medium tracking-wider"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                CATEGORY
+              </p>
+
+              {/* Pulsing indicator while AI is in-flight */}
+              {aiLoading && (
+                <span
+                  className="text-xs"
+                  style={{ color: 'var(--color-accent)', opacity: 0.65 }}
+                >
+                  ✦ detecting…
+                </span>
+              )}
+
+              {/* Sparkle badge: AI auto-selected the current category */}
+              {showAiBadge && (
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: 'var(--color-accent)' }}
+                >
+                  ✦ AI suggested
+                </span>
+              )}
+
+              {/* Override note: user picked something different from AI */}
+              {showAiOverrideNote && (
+                <span
+                  className="text-xs"
+                  style={{ color: 'var(--text-secondary)', opacity: 0.55 }}
+                >
+                  AI: {aiSuggestion!.category}
+                </span>
+              )}
+            </div>
+
             <CategoryPicker
               selected={categoryId}
-              onSelect={(id) => setCategoryId(id)}
+              onSelect={handleCategorySelect}
               categories={categories}
             />
           </div>
@@ -338,9 +504,9 @@ export function AddExpenseModal({ isOpen, onClose, origin, prefill }: AddExpense
               max={todayISO()}
               className="w-full mt-3 p-3 rounded-lg border text-sm"
               style={{
-                borderColor: 'var(--border-input)',
+                borderColor:     'var(--border-input)',
                 backgroundColor: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
+                color:           'var(--text-primary)',
               }}
             />
           )}

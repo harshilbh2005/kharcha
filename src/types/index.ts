@@ -597,3 +597,22 @@ export interface DerivedKeyBundle {
   key: CryptoKey;
   salt: Uint8Array;
 }
+
+// ============================================================
+// AI Intelligence (Section 11)
+// ============================================================
+
+/**
+ * Result from the 3-tier AI categorization system.
+ * source indicates which tier produced the result:
+ *   'cache'    — Tier 1: ai_learning table (user-specific, fastest)
+ *   'keywords' — Tier 2: static KEYWORD_RULES map (free, instant)
+ *   'ai'       — Tier 3: Claude Sonnet 4.5 API call (~$0.001)
+ */
+export interface CategorizationResult {
+  category: string;
+  subcategory: string | null;
+  is_need: boolean;
+  confidence: number;
+  source: 'cache' | 'keywords' | 'ai';
+}
