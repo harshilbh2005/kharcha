@@ -88,12 +88,14 @@ export function calculateBudget(state: BudgetState): BudgetResult {
   // Projected balance at end of month if current rate continues
   const projectedMonthEnd = totalIncome - dailyAvgSpend * daysInMonth - expectedSubscriptions;
 
-  // Days until we run out of money at current daily burn rate
+  // Days until we run out of money at current daily burn rate.
+  // Only show if user will run out WITHIN the current month.
   let daysUntilBroke: number | null = null;
   if (availableBudget <= 0) {
     daysUntilBroke = 0;
   } else if (dailyAvgSpend > 0) {
-    daysUntilBroke = Math.floor(availableBudget / dailyAvgSpend);
+    const days = Math.floor(availableBudget / dailyAvgSpend);
+    daysUntilBroke = days <= daysRemaining ? days : null;
   }
 
   return {

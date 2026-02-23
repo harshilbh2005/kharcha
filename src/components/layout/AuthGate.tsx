@@ -15,6 +15,7 @@
 //   3. Inactivity timer (5 min) → re-locks the app
 // ============================================================
 
+import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import PinLockScreen from '@/components/layout/PinLockScreen';
 import { usePinLock } from '@/hooks/usePinLock';
@@ -36,6 +37,17 @@ export default function AuthGate({ pinEnabled, children }: AuthGateProps) {
     submitPin,
   } = usePinLock(userId ?? null);
 
+  // Read saved PIN length from localStorage (set during onboarding)
+  const [pinLength, setPinLength] = useState<4 | 6>(6);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kharcha_pin_length');
+      if (saved === '4' || saved === '6') {
+        setPinLength(Number(saved) as 4 | 6);
+      }
+    } catch {}
+  }, []);
+
   // If PIN is not enabled (shouldn't happen post-onboarding, but defensive),
   // skip the lock screen entirely
   if (!pinEnabled) {
@@ -52,6 +64,7 @@ export default function AuthGate({ pinEnabled, children }: AuthGateProps) {
         lockoutSeconds={lockoutSeconds}
         isFullyLocked={isFullyLocked}
         onSubmit={submitPin}
+        pinLength={pinLength}
       />
     </>
   );

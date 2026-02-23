@@ -12,7 +12,7 @@
 // The parent (transactions/page.tsx) owns the filter state.
 // ============================================================
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { useCategories } from "@/hooks/useCategories";
@@ -47,8 +47,6 @@ function buildMonths(): { label: string; value: string }[] {
     return { label: format(d, "MMM yy"), value: format(d, "yyyy-MM") };
   });
 }
-
-const MONTHS = buildMonths();
 
 // ─── Shared Pill button ───────────────────────────────────────────────────────
 
@@ -90,6 +88,9 @@ export function FilterBar({
 }: FilterBarProps) {
   const { data: categories = [] } = useCategories();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Build months inside the component to avoid module-level Date() hydration mismatches
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const MONTHS = useMemo(() => buildMonths(), []);
 
   const monthsRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);

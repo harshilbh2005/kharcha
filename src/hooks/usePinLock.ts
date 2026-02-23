@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useEncryptionStore } from '@/stores/encryption-store';
+import { useEncryptionStore, restoreKeyFromSession } from '@/stores/encryption-store';
 import { deriveKey } from '@/lib/crypto';
 import { verifyPin } from '@/app/actions/auth';
 
@@ -48,6 +48,7 @@ export function usePinLock(clerkUserId: string | null) {
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenTimestamp = useRef<number | null>(null);
   const lockoutInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restorationAttempted = useRef(false);
 
   // ── Lock the app ──────────────────────────────────────────────
   const lock = useCallback(() => {
@@ -64,6 +65,24 @@ export function usePinLock(clerkUserId: string | null) {
     updateActivity();
     inactivityTimer.current = setTimeout(lock, INACTIVITY_TIMEOUT);
   }, [lock, updateActivity]);
+
+  // ── Restore key from sessionStorage on mount (survives refresh) ──
+  useEffect(() => {
+    if (restorationAttempted.current) return;
+    restorationAttempted.current = true;
+
+    // Only attempt if currently locked and store is empty
+    if (!useEncryptionStore.getState().isUnlocked) {
+      restoreKeyFromSession().then((result) => {
+        if (result) {
+          setKey(result.key, result.salt);
+          setIsLocked(false);
+          resetInactivityTimer();
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Submit PIN for verification ───────────────────────────────
   const submitPin = useCallback(

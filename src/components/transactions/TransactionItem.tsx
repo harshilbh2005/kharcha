@@ -20,11 +20,12 @@ function formatAmount(amount: number): string {
 
 function formatTime(time: string | null): string {
   if (!time) return "";
-  // time is stored as "HH:MM:SS" or "HH:MM"
+  // time is stored as "HH:MM:SS" or "HH:MM" — format without new Date()
   const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  const h = hours % 12 || 12;
+  const m = String(minutes).padStart(2, "0");
+  const ampm = hours < 12 ? "am" : "pm";
+  return `${h}:${m} ${ampm}`;
 }
 
 // ─── Swipe-to-delete threshold (px) ──────────────────────────────────────────

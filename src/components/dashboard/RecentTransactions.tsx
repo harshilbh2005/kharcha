@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
+import { differenceInCalendarDays, format } from 'date-fns';
 import Card from '@/components/ui/Card';
 import { getIcon } from '@/lib/icon-map';
 import type { TransactionDecrypted } from '@/types';
@@ -29,18 +30,14 @@ function formatAmount(amount: number): string {
 
 function formatRelativeDate(dateStr: string): string {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const date = new Date(dateStr);
-  date.setHours(0, 0, 0, 0);
-
-  const diffMs = today.getTime() - date.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const date = new Date(dateStr + 'T00:00:00');
+  const diffDays = differenceInCalendarDays(today, date);
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d ago`;
 
-  return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  return format(date, 'd MMM');
 }
 
 // ─── Compact transaction row variants ─────────────────────────────────────────

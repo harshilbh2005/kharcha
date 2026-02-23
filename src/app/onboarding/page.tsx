@@ -2,7 +2,7 @@
 
 // ============================================================
 // KHARCHA — Onboarding Wizard
-// 4-step flow: Welcome → Name → PIN Setup → All Set
+// 5-step flow: Welcome → Name → PIN Length → PIN Setup → All Set
 // Shows only for first-time users (onboarding_completed = false).
 // ============================================================
 
@@ -19,9 +19,7 @@ import { useEncryptionStore } from '@/stores/encryption-store';
 
 // ── Constants ───────────────────────────────────────────────────
 
-const MAX_PIN_LENGTH = 6;
-const MIN_PIN_LENGTH = 4;
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const NUM_KEYS = [
   ['1', '2', '3'],
@@ -104,6 +102,9 @@ export default function OnboardingPage() {
   // ── Form state ──────────────────────────────────────────────
   const [displayName, setDisplayName] = useState('');
 
+  // ── PIN length choice ─────────────────────────────────────
+  const [pinLength, setPinLength] = useState<4 | 6>(4);
+
   // ── PIN state ───────────────────────────────────────────────
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -141,16 +142,16 @@ export default function OnboardingPage() {
       }
 
       setter((prev) => {
-        if (prev.length >= MAX_PIN_LENGTH) return prev;
+        if (prev.length >= pinLength) return prev;
         return prev + key;
       });
     },
-    [isConfirmingPin, isSubmitting],
+    [isConfirmingPin, isSubmitting, pinLength],
   );
 
   // ── Physical keyboard support ─────────────────────────────
   useEffect(() => {
-    if (step !== 2) return;
+    if (step !== 3) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key >= '0' && e.key <= '9') {
@@ -167,7 +168,7 @@ export default function OnboardingPage() {
   // ── PIN confirmation check ────────────────────────────────
   useEffect(() => {
     if (!isConfirmingPin) return;
-    if (confirmPin.length < MIN_PIN_LENGTH) {
+    if (confirmPin.length < pinLength) {
       confirmChecked.current = false;
       return;
     }
@@ -193,16 +194,16 @@ export default function OnboardingPage() {
     }
   }, [confirmPin, pin, isConfirmingPin, goForward]);
 
-  // ── Handle "Continue" on PIN entry (step 2, before confirm) ─
+  // ── Handle "Continue" on PIN entry (step 3, before confirm) ─
   const handlePinContinue = useCallback(() => {
-    if (pin.length >= MIN_PIN_LENGTH) {
+    if (pin.length === pinLength) {
       setIsConfirmingPin(true);
       setPinError(null);
       confirmChecked.current = false;
     }
-  }, [pin]);
+  }, [pin, pinLength]);
 
-  // ── Complete onboarding (step 3 button) ─────────────────────
+  // ── Complete onboarding (step 4 button) ─────────────────────
   const handleComplete = useCallback(async () => {
     if (!userId) return;
 
@@ -222,6 +223,9 @@ export default function OnboardingPage() {
         return;
       }
 
+      // Save PIN length to localStorage for lock screen
+      try { localStorage.setItem('kharcha_pin_length', String(pinLength)); } catch {}
+
       // Derive encryption key from PIN + returned salt
       const saltBytes = Uint8Array.from(atob(result.salt), (c) =>
         c.charCodeAt(0),
@@ -235,7 +239,7 @@ export default function OnboardingPage() {
       setSubmitError('Something went wrong. Please try again.');
       setIsSubmitting(false);
     }
-  }, [userId, displayName, pin, setKey, router]);
+  }, [userId, displayName, pin, pinLength, setKey, router]);
 
   // ── Step 0: Welcome ─────────────────────────────────────────
 
@@ -302,19 +306,90 @@ export default function OnboardingPage() {
     </div>
   );
 
-  // ── Step 2: PIN Setup ───────────────────────────────────────
+  // ── Step 2: PIN Length Choice ────────────────────────────────
+
+  const renderPinChoice = () => (
+    <div className="flex w-full flex-col items-center text-center">
+      <ShieldCheck size={32} className="mb-3 text-bronze" />
+
+      <h2 className="font-display text-xl text-ink-primary">
+        Choose your PIN length
+      </h2>
+      <p className="mt-1 font-body text-sm text-ink-secondary">
+        How many digits for your security PIN?
+      </p>
+
+      <div className="mt-8 flex w-full gap-3">
+        {([4, 6] as const).map((len) => {
+          const selected = pinLength === len;
+          return (
+            <motion.button
+              key={len}
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setPinLength(len)}
+              className="flex-1 flex flex-col items-center gap-2 rounded-xl py-6 cursor-pointer select-none transition-colors"
+              style={{
+                background: selected ? 'var(--color-accent)' : 'var(--bg-surface)',
+                border: selected
+                  ? '2px solid var(--color-accent)'
+                  : '2px solid var(--border-default)',
+              }}
+            >
+              {/* Dot preview */}
+              <div className="flex gap-1.5">
+                {Array.from({ length: len }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{
+                      backgroundColor: selected ? '#fff' : 'var(--border-default)',
+                    }}
+                  />
+                ))}
+              </div>
+              <span
+                className="font-display text-lg"
+                style={{ color: selected ? '#fff' : 'var(--text-primary)' }}
+              >
+                {len} digits
+              </span>
+              <span
+                className="font-body text-xs"
+                style={{ color: selected ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)' }}
+              >
+                {len === 4 ? 'Quick & easy' : 'Extra secure'}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      <Button
+        className="mt-8"
+        size="lg"
+        fullWidth
+        onClick={goForward}
+      >
+        Continue
+        <ArrowRight size={18} />
+      </Button>
+    </div>
+  );
+
+  // ── Step 3: PIN Setup ───────────────────────────────────────
 
   const renderPin = () => (
     <div className="flex w-full flex-col items-center text-center">
       <Lock size={32} className="mb-3 text-bronze" />
 
       <h2 className="font-display text-xl text-ink-primary">
-        {isConfirmingPin ? 'Confirm your PIN' : 'Secure your finances'}
+        {isConfirmingPin ? 'Confirm your PIN' : 'Create your PIN'}
       </h2>
       <p className="mt-1 font-body text-sm text-ink-secondary">
         {isConfirmingPin
           ? 'Re-enter the same PIN'
-          : 'Create a 4–6 digit PIN to protect your data'}
+          : `Enter a ${pinLength}-digit PIN to protect your data`}
       </p>
 
       {/* PIN circles */}
@@ -324,7 +399,7 @@ export default function OnboardingPage() {
         transition={{ duration: 0.4, ease: 'easeInOut' }}
         className="mt-6 flex gap-3"
       >
-        {Array.from({ length: MAX_PIN_LENGTH }).map((_, i) => {
+        {Array.from({ length: pinLength }).map((_, i) => {
           const isFilled = i < currentPin.length;
           return (
             <motion.div
@@ -391,7 +466,7 @@ export default function OnboardingPage() {
           size="lg"
           fullWidth
           onClick={handlePinContinue}
-          disabled={pin.length < MIN_PIN_LENGTH}
+          disabled={pin.length !== pinLength}
         >
           Continue
           <ArrowRight size={18} />
@@ -400,69 +475,108 @@ export default function OnboardingPage() {
     </div>
   );
 
-  // ── Step 3: All Set ─────────────────────────────────────────
+  // ── Step 4: All Set ─────────────────────────────────────────
 
   const renderComplete = () => (
     <div className="flex w-full flex-col items-center text-center">
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-      >
-        <ShieldCheck size={56} className="text-sage" />
-      </motion.div>
+      {isSubmitting ? (
+        /* ── Full-screen loading state while setting up ── */
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-6 py-8"
+        >
+          {/* Pulsing lock icon */}
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <Lock size={48} style={{ color: 'var(--color-accent)' }} />
+          </motion.div>
 
-      <h2 className="mt-4 font-display text-2xl text-ink-primary">
-        You&apos;re all set!
-      </h2>
-      <p className="mt-1 font-body text-sm text-ink-secondary">
-        Your data is encrypted and secure
-      </p>
+          {/* Animated dots */}
+          <div className="flex gap-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: 'var(--color-accent)' }}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{
+                  duration: 1,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+              />
+            ))}
+          </div>
 
-      {/* Security summary */}
-      <div className="mt-6 w-full space-y-3">
-        <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
-          <CheckCircle2 size={20} className="shrink-0 text-sage" />
-          <span className="font-body text-sm text-ink-primary">
-            Encryption: AES-256-GCM
-          </span>
-        </div>
-        <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
-          <CheckCircle2 size={20} className="shrink-0 text-sage" />
-          <span className="font-body text-sm text-ink-primary">
-            PIN Protected
-          </span>
-        </div>
-        <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
-          <CheckCircle2 size={20} className="shrink-0 text-sage" />
-          <span className="font-body text-sm text-ink-primary">
-            Zero-knowledge — only you can see your data
-          </span>
-        </div>
-      </div>
+          <p className="font-body text-sm text-ink-secondary">
+            Encrypting your vault...
+          </p>
+        </motion.div>
+      ) : (
+        /* ── Success summary ── */
+        <>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          >
+            <ShieldCheck size={56} className="text-sage" />
+          </motion.div>
 
-      {/* Error */}
-      {submitError && (
-        <p className="mt-4 font-body text-sm text-terracotta">{submitError}</p>
+          <h2 className="mt-4 font-display text-2xl text-ink-primary">
+            You&apos;re all set!
+          </h2>
+          <p className="mt-1 font-body text-sm text-ink-secondary">
+            Your data is encrypted and secure
+          </p>
+
+          {/* Security summary */}
+          <div className="mt-6 w-full space-y-3">
+            <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
+              <CheckCircle2 size={20} className="shrink-0 text-sage" />
+              <span className="font-body text-sm text-ink-primary">
+                Encryption: AES-256-GCM
+              </span>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
+              <CheckCircle2 size={20} className="shrink-0 text-sage" />
+              <span className="font-body text-sm text-ink-primary">
+                {pinLength}-digit PIN Protected
+              </span>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-stone-surface px-4 py-3">
+              <CheckCircle2 size={20} className="shrink-0 text-sage" />
+              <span className="font-body text-sm text-ink-primary">
+                Zero-knowledge — only you can see your data
+              </span>
+            </div>
+          </div>
+
+          {/* Error */}
+          {submitError && (
+            <p className="mt-4 font-body text-sm text-terracotta">{submitError}</p>
+          )}
+
+          <Button
+            className="mt-8"
+            size="lg"
+            fullWidth
+            onClick={handleComplete}
+          >
+            Start Tracking
+            <ArrowRight size={18} />
+          </Button>
+        </>
       )}
-
-      <Button
-        className="mt-8"
-        size="lg"
-        fullWidth
-        onClick={handleComplete}
-        loading={isSubmitting}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? 'Setting up...' : 'Start Tracking'}
-        {!isSubmitting && <ArrowRight size={18} />}
-      </Button>
     </div>
   );
 
   // ── Render ──────────────────────────────────────────────────
 
-  const steps = [renderWelcome, renderName, renderPin, renderComplete];
+  const steps = [renderWelcome, renderName, renderPinChoice, renderPin, renderComplete];
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-stone-global px-6 py-8">

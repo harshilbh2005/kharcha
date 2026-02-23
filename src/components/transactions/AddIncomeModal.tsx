@@ -15,6 +15,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 import {
   Wallet, Shield, Gift, ArrowRightLeft,
   RefreshCw, MoreHorizontal,
@@ -32,15 +33,11 @@ import type { VaultUpdatePayload } from '@/app/actions/income';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 function formatDateDisplay(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  return format(new Date(iso + 'T00:00:00'), 'EEE, d MMM');
 }
 
 /** Convert hex color to rgba string for selected-state tints. */
@@ -88,14 +85,16 @@ const INCOME_TYPE_DEFS: IncomeTypeDef[] = [
   { type: 'other',          label: 'Other',             Icon: MoreHorizontal },
 ];
 
-const DESCRIPTION_PLACEHOLDER: Record<IncomeType, string> = {
-  allowance:      `${new Date().toLocaleString('en-IN', { month: 'long' })} allowance`,
-  emergency_fund: 'Emergency fund deposit',
-  festival_bonus: 'Diwali bonus',
-  pass_through:   'College fees Q1',
-  vault_replenish:'Vault replenishment',
-  other:          'Additional income',
-};
+function getDescriptionPlaceholder(type: IncomeType): string {
+  switch (type) {
+    case 'allowance':      return `${format(new Date(), 'MMMM')} allowance`;
+    case 'emergency_fund': return 'Emergency fund deposit';
+    case 'festival_bonus': return 'Diwali bonus';
+    case 'pass_through':   return 'College fees Q1';
+    case 'vault_replenish':return 'Vault replenishment';
+    case 'other':          return 'Additional income';
+  }
+}
 
 // ── TypeCard ──────────────────────────────────────────────────────────────────
 
@@ -392,7 +391,7 @@ export function AddIncomeModal({ isOpen, onClose }: AddIncomeModalProps) {
               setDescription(e.target.value);
               if (descError) setDescError('');
             }}
-            placeholder={DESCRIPTION_PLACEHOLDER[incomeType]}
+            placeholder={getDescriptionPlaceholder(incomeType)}
             disabled={isLoading}
             maxLength={200}
             aria-label="Description"

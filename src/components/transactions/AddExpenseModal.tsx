@@ -17,6 +17,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react';
+import { format } from 'date-fns';
 import { InkSpread } from '@/components/animations/InkSpread';
 import { CategoryPicker } from '@/components/transactions/CategoryPicker';
 import { NeedWantToggle } from '@/components/transactions/NeedWantToggle';
@@ -30,15 +31,11 @@ import { amountSchema } from '@/lib/validations';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 function formatDateDisplay(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+  return format(new Date(iso + 'T00:00:00'), 'EEE, d MMM');
 }
 
 function formatINR(amount: number): string {

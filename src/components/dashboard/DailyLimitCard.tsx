@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { addDays, format } from 'date-fns';
 import Card from '@/components/ui/Card';
 import type { BurnStatus } from '@/types';
 
@@ -58,9 +59,7 @@ function formatINR(amount: number): string {
  * e.g. "Feb 25" or "Mar 3"
  */
 function futureDateLabel(today: Date, daysFromNow: number): string {
-  const target = new Date(today);
-  target.setDate(target.getDate() + daysFromNow);
-  return target.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  return format(addDays(today, daysFromNow), 'd MMM');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

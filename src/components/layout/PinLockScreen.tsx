@@ -16,10 +16,9 @@ interface PinLockScreenProps {
   lockoutSeconds: number | null;
   isFullyLocked: boolean;
   onSubmit: (pin: string) => void;
+  /** Number of PIN digits (4 or 6). Defaults to 6 for backward compat. */
+  pinLength?: 4 | 6;
 }
-
-const MAX_PIN_LENGTH = 6;
-const MIN_PIN_LENGTH = 4;
 
 const NUM_KEYS = [
   ['1', '2', '3'],
@@ -35,6 +34,7 @@ export default function PinLockScreen({
   lockoutSeconds,
   isFullyLocked,
   onSubmit,
+  pinLength = 6,
 }: PinLockScreenProps) {
   const [pin, setPin] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -54,11 +54,11 @@ export default function PinLockScreen({
       }
 
       setPin((prev) => {
-        if (prev.length >= MAX_PIN_LENGTH) return prev;
+        if (prev.length >= pinLength) return prev;
         return prev + key;
       });
     },
-    [isDisabled],
+    [isDisabled, pinLength],
   );
 
   // ── Physical keyboard support ─────────────────────────────────
@@ -77,25 +77,12 @@ export default function PinLockScreen({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLocked, handleKey]);
 
-  // ── Auto-submit when PIN reaches min length ───────────────────
+  // ── Auto-submit when PIN reaches exact length ─────────────────
   useEffect(() => {
-    if (pin.length >= MIN_PIN_LENGTH && pin.length <= MAX_PIN_LENGTH) {
-      // Auto-submit at max length, or allow manual submit
-      if (pin.length === MAX_PIN_LENGTH) {
-        onSubmit(pin);
-      }
+    if (pin.length === pinLength) {
+      onSubmit(pin);
     }
-  }, [pin, onSubmit]);
-
-  // Submit at 4 or 5 digits after a brief delay to allow continuing to type
-  useEffect(() => {
-    if (pin.length >= MIN_PIN_LENGTH && pin.length < MAX_PIN_LENGTH) {
-      const timer = setTimeout(() => {
-        onSubmit(pin);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [pin, onSubmit]);
+  }, [pin, pinLength, onSubmit]);
 
   // ── React to error → shake + clear ────────────────────────────
   useEffect(() => {
@@ -157,7 +144,7 @@ export default function PinLockScreen({
             transition={{ duration: 0.4, ease: 'easeInOut' }}
             className="mb-8 flex gap-3"
           >
-            {Array.from({ length: MAX_PIN_LENGTH }).map((_, i) => {
+            {Array.from({ length: pinLength }).map((_, i) => {
               const isFilled = i < pin.length;
               const isSuccess = showSuccess && isFilled;
 
