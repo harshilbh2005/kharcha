@@ -23,6 +23,8 @@ export interface DashboardBudget extends BudgetResult {
   totalBudget: number;
   /** Total expenses (excludes pass-through) */
   totalSpent: number;
+  /** Upcoming subscription costs reserved from available balance */
+  expectedSubscriptions: number;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export function useBudget() {
         ...result,
         totalBudget: totalIncome,
         totalSpent: totalExpenses,
+        expectedSubscriptions,
       };
     },
     enabled: isUnlocked,

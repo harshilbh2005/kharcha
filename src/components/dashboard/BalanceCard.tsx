@@ -16,6 +16,8 @@ export interface BalanceCardProps {
   totalBudget: number;
   /** Budget horizon date — spending must last until this date */
   budgetHorizon: Date | null;
+  /** Upcoming subscription costs reserved from available balance */
+  expectedSubscriptions?: number;
   /** Stagger delay for card entrance animation */
   delay?: number;
 }
@@ -48,6 +50,7 @@ export function BalanceCard({
   totalSpent,
   totalBudget,
   budgetHorizon,
+  expectedSubscriptions = 0,
   delay = 0,
 }: BalanceCardProps) {
   const isLow = availableBalance <= 0;
@@ -129,6 +132,19 @@ export function BalanceCard({
         {' spent of '}
         <span className="font-mono">₹{formatINR(totalBudget)}</span>
       </p>
+
+      {/* ── Subscription reserved note ─────────────────────────────────── */}
+      {expectedSubscriptions > 0 && (
+        <p
+          className="font-body text-xs mt-1"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <span className="font-mono" style={{ color: 'var(--color-accent)' }}>
+            ₹{formatINR(expectedSubscriptions)}
+          </span>
+          {' reserved for subscriptions'}
+        </p>
+      )}
 
       {/* ── Horizon line ─────────────────────────────────────────────────── */}
       {horizonLabel && (

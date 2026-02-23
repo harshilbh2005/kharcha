@@ -143,6 +143,7 @@ export default function DashboardPage() {
               totalSpent={budget?.totalSpent ?? 0}
               totalBudget={budget?.totalBudget ?? 0}
               budgetHorizon={budget?.budgetHorizon ?? null}
+              expectedSubscriptions={budget?.expectedSubscriptions ?? 0}
             />
 
             {/* ── Half-width row: DailyLimit + VaultPreview ─────────────────── */}
@@ -167,7 +168,7 @@ export default function DashboardPage() {
                 className="text-xs text-center -mt-1"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                Budget period: {format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'MMM d')}
+                Budget period: {format(new Date(), 'MMM d')}
                 {' → '}
                 {format(budget.budgetHorizon, 'MMM d')}
               </p>

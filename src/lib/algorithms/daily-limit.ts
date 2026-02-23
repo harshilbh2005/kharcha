@@ -148,21 +148,18 @@ function deriveBurnStatus(burnRate: number): BurnStatus {
 /**
  * Get the start date of the current budget period.
  *
- * For simplicity, this returns the 1st of the current calendar month.
- * The budget period runs from this date through the budget horizon.
+ * Returns **today** — the continuous-balance model spreads the
+ * remaining available balance over the days from today to the horizon.
+ * Using today as the start means burn-rate is always measured from
+ * the current moment, which gives meaningful results regardless of
+ * when income was received.
  *
- * Examples:
- *   - Feb allowance only → period: Feb 1 – Feb 28
- *   - Feb + March allowance → period: Feb 1 – Mar 31
- *   - Called on Feb 15 → always returns Feb 1
- *
- * @param _latestTargetMonth - Currently unused; reserved for future
- *   multi-month start detection (e.g., if user starts mid-month)
- * @returns Date object set to midnight on the 1st of the current month
+ * @param _latestTargetMonth - Currently unused; reserved for future use
+ * @returns Date object set to midnight today
  */
 export function getHorizonStartDate(_latestTargetMonth: string | null): Date {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 /**
