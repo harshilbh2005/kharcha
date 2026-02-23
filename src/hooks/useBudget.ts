@@ -12,10 +12,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEncryption } from './useEncryption';
+import { calculateBudget } from '@/lib/algorithms/daily-limit';
 import type {
   BudgetState,
   BudgetResult,
-  BurnStatus,
   MonthlyBudgetQueryResult,
   IncomeType,
 } from '@/types';
@@ -33,80 +33,6 @@ export interface DashboardBudget extends BudgetResult {
   totalBudget: number;
   /** Total expenses for the month (excludes pass-through) */
   totalSpent: number;
-}
-
-// ── Budget algorithm ──────────────────────────────────────────────────────────
-
-/**
- * Pure function — converts raw budget state to display-ready budget result.
- *
- * Algorithms (MASTER_PROJECT_DOCUMENT.md §7.1):
- *   availableBudget   = (allowance + bonus − subscriptions) − totalExpenses
- *   dailyLimit        = availableBudget / daysRemaining (×1.3 on weekends)
- *   burnRate          = actualSpent / idealSpentByNow
- *   burnStatus        ≤ 0.9 → safe | ≤ 1.2 → caution | > 1.2 → danger
- *   projectedMonthEnd = totalIncome − (dailyAvgSpend × daysInMonth) − subscriptions
- *   daysUntilBroke    = floor(availableBudget / dailyAvgSpend), null when no spend yet
- */
-export function calculateBudget(state: BudgetState): BudgetResult {
-  const {
-    totalAllowance,
-    totalBonus,
-    totalExpenses,
-    expectedSubscriptions,
-    dayOfMonth,
-    daysInMonth,
-    isWeekend,
-  } = state;
-
-  const totalIncome = totalAllowance + totalBonus;
-  const netBudget = totalIncome - expectedSubscriptions;
-  const availableBudget = netBudget - totalExpenses;
-  const daysRemaining = Math.max(1, daysInMonth - dayOfMonth + 1);
-
-  // Days fully elapsed (yesterday and earlier)
-  const daysElapsed = dayOfMonth - 1;
-
-  // Ideal spend by the end of yesterday at a perfectly linear rate
-  const idealSpentByNow = daysElapsed > 0 ? (daysElapsed / daysInMonth) * netBudget : 0;
-
-  // Burn rate: how fast we're spending relative to the ideal linear rate
-  const burnRate = idealSpentByNow > 0 ? totalExpenses / idealSpentByNow : 0;
-
-  const burnStatus: BurnStatus =
-    burnRate <= 0.9 ? 'safe' : burnRate <= 1.2 ? 'caution' : 'danger';
-
-  // Base daily limit for today; weekends get a 1.3× boost
-  const baseDailyLimit = availableBudget / daysRemaining;
-  const dailyLimit = isWeekend ? baseDailyLimit * 1.3 : baseDailyLimit;
-
-  const weeklyBudget = dailyLimit * 7;
-
-  // Average daily spend so far (₹/day over elapsed days)
-  const dailyAvgSpend = daysElapsed > 0 ? totalExpenses / daysElapsed : 0;
-
-  // Projected balance at end of month if current rate continues
-  const projectedMonthEnd = totalIncome - dailyAvgSpend * daysInMonth - expectedSubscriptions;
-
-  // Days until we run out of money at current daily burn rate.
-  // Only show if user will run out WITHIN the current month.
-  let daysUntilBroke: number | null = null;
-  if (availableBudget <= 0) {
-    daysUntilBroke = 0;
-  } else if (dailyAvgSpend > 0) {
-    const days = Math.floor(availableBudget / dailyAvgSpend);
-    daysUntilBroke = days <= daysRemaining ? days : null;
-  }
-
-  return {
-    availableBudget,
-    dailyLimit,
-    burnRate,
-    burnStatus,
-    projectedMonthEnd,
-    daysUntilBroke,
-    weeklyBudget,
-  };
 }
 
 // ── Income type categorisation ────────────────────────────────────────────────

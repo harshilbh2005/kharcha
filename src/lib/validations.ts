@@ -160,6 +160,29 @@ export const createSubscriptionSchema = z.object({
 
 export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
 
+/**
+ * Partial update of an existing subscription.
+ * All fields optional — only provided fields are written.
+ * `id` is passed separately to the server action.
+ */
+export const updateSubscriptionSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  amount_encrypted: encryptedField.optional(),
+  amount_inr_encrypted: encryptedField.nullable().optional(),
+  currency: z.enum(['INR', 'USD']).optional(),
+  billing_day: z.number().int().min(1).max(31).nullable().optional(),
+  billing_cycle: z.enum(['monthly', 'yearly']).optional(),
+  category_id: uuidField.nullable().optional(),
+  is_active: z.boolean().optional(),
+  next_billing_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').nullable().optional(),
+  last_paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').nullable().optional(),
+  auto_match_keywords: z.array(z.string().trim().max(50)).max(10).nullable().optional(),
+  remind_days_before: z.number().int().min(0).max(14).optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
+export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
+
 // ============================================================
 // 6. SMS PASTE
 // ============================================================

@@ -202,7 +202,7 @@ export function calculateBudget(state: BudgetState): BudgetResult {
   // Simple 7× daily limit for a glanceable weekly number.
   // Uses the adjusted daily limit (with weekend multiplier if applicable).
 
-  const weeklyBudget = Math.round(dailyLimit * 7);
+  const weeklyBudget = Math.round(Math.min(dailyLimit * 7, Math.max(available, 0)));
 
   // ── Return ──────────────────────────────────────────────────────────────────
 
