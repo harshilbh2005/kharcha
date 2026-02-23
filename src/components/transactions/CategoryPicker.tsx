@@ -69,7 +69,7 @@ function CategoryItem({ category, isSelected, onSelect }: CategoryItemProps) {
     <button
       type="button"
       onClick={handlePress}
-      className="flex flex-col items-center gap-1 p-1 w-full min-h-[64px] focus-visible:outline-none"
+      className="flex flex-col items-center gap-1 p-1 w-full min-h-16 focus-visible:outline-none"
       aria-pressed={isSelected}
       aria-label={category.name}
     >

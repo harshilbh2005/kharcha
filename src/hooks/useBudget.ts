@@ -20,6 +20,21 @@ import type {
   IncomeType,
 } from '@/types';
 
+// ── Dashboard-specific budget type ──────────────────────────────────────────
+
+/**
+ * Extends BudgetResult with raw financial totals needed by dashboard cards.
+ * The base BudgetResult is a pure calculation output; DashboardBudget adds
+ * the source values so BalanceCard can show "₹X spent of ₹Y" without
+ * reverse-engineering them from derived metrics.
+ */
+export interface DashboardBudget extends BudgetResult {
+  /** Total income for the month (allowance + bonus) */
+  totalBudget: number;
+  /** Total expenses for the month (excludes pass-through) */
+  totalSpent: number;
+}
+
 // ── Budget algorithm ──────────────────────────────────────────────────────────
 
 /**
@@ -103,7 +118,7 @@ const BONUS_TYPES: IncomeType[] = ['festival_bonus', 'other', 'vault_replenish']
 /**
  * Fetches, decrypts, and calculates the monthly budget in one step.
  *
- * @returns TanStack Query result with `data: BudgetResult` when the app
+ * @returns TanStack Query result with `data: DashboardBudget` when the app
  *          is unlocked and data is available; `undefined` otherwise.
  *
  * staleTime: 30 s — budget should feel real-time after every transaction.
@@ -111,7 +126,7 @@ const BONUS_TYPES: IncomeType[] = ['festival_bonus', 'other', 'vault_replenish']
 export function useBudget() {
   const { isUnlocked, decryptMany } = useEncryption();
 
-  return useQuery<BudgetResult>({
+  return useQuery<DashboardBudget>({
     queryKey: ['budget', 'monthly'],
     queryFn: async () => {
       // ── 1. Fetch encrypted budget data ──────────────────────
@@ -166,7 +181,13 @@ export function useBudget() {
         isWeekend,
       };
 
-      return calculateBudget(state);
+      const result = calculateBudget(state);
+
+      return {
+        ...result,
+        totalBudget: totalAllowance + totalBonus,
+        totalSpent: totalExpenses,
+      };
     },
     // Only run when the app is unlocked — no key = cannot decrypt
     enabled: isUnlocked,
