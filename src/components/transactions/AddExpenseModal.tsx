@@ -31,8 +31,19 @@ import { useBudget } from '@/hooks/useBudget';
 import { useEncryption } from '@/hooks/useEncryption';
 import { amountSchema } from '@/lib/validations';
 import { saveAiLearningOverride } from '@/app/actions/ai';
-import { extractMerchantKeyword } from '@/lib/ai/categorize';
 import type { CategorizationResult } from '@/types';
+
+/** Extract a short normalised keyword for ai_learning cache key (client-safe). */
+function extractMerchantKeyword(description: string): string {
+  return description
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[^a-z0-9\s.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 50);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
