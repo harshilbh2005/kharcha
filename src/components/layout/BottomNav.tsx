@@ -58,7 +58,7 @@ function NavTabItem({ tab, active }: { tab: TabDef; active: boolean }) {
     <Link
       href={tab.path}
       aria-current={active ? "page" : undefined}
-      className="flex flex-col items-center gap-1 flex-1 py-1 focus:outline-none focus-visible:ring-2"
+      className="flex flex-col items-center gap-1 flex-1 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-bronze focus-visible:ring-offset-1"
       style={{
         color: active ? "var(--color-accent)" : "var(--text-secondary)",
         textDecoration: "none",

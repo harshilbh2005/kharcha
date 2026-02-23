@@ -589,6 +589,8 @@ export interface MonthlyAnalyticsQueryResult {
     category_name: string | null;
     category_id: string | null;
     is_subscription: boolean;
+    is_need: boolean;
+    date: string;
   }>;
 }
 

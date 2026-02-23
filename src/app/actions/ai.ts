@@ -10,8 +10,20 @@
 // ============================================================
 
 import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { saveAiLearning } from '@/lib/ai/categorize';
+import { sanitizeText } from '@/lib/sanitize';
+
+// ── Validation ───────────────────────────────────────────────────────────────
+
+const aiLearningSchema = z.object({
+  merchantKeyword:     z.string().trim().min(1).max(50).transform(sanitizeText),
+  userCategory:        z.string().trim().min(1).max(50).transform(sanitizeText),
+  userSubcategory:     z.string().trim().max(50).transform(sanitizeText).nullable(),
+  isNeed:              z.boolean(),
+  aiSuggestedCategory: z.string().trim().max(50).transform(sanitizeText).nullable(),
+}).strict();
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,12 +38,6 @@ type ActionResult = { success: true } | { error: string };
  * differs from the AI suggestion.  This teaches the system the user's
  * preference for that merchant so future transactions are categorized
  * correctly without an API call (Tier 1 cache hit).
- *
- * @param merchantKeyword      - Normalized description snippet (≤ 50 chars)
- * @param userCategory         - Category name chosen by the user
- * @param userSubcategory      - Subcategory (null — not exposed in UI)
- * @param isNeed               - Need / Want value chosen by the user
- * @param aiSuggestedCategory  - What the AI originally suggested (for analytics)
  */
 export async function saveAiLearningOverride(
   merchantKeyword:     string,
@@ -40,9 +46,26 @@ export async function saveAiLearningOverride(
   isNeed:              boolean,
   aiSuggestedCategory: string | null,
 ): Promise<ActionResult> {
+  // ── Auth ────────────────────────────────────────────────────────────────────
   const { userId } = await auth();
   if (!userId) return { error: 'Unauthenticated' };
 
+  // ── Validate & sanitize ─────────────────────────────────────────────────────
+  const parsed = aiLearningSchema.safeParse({
+    merchantKeyword,
+    userCategory,
+    userSubcategory,
+    isNeed,
+    aiSuggestedCategory,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+  }
+
+  const validated = parsed.data;
+
+  // ── Profile lookup ──────────────────────────────────────────────────────────
   const supabase = await createClient();
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -52,14 +75,15 @@ export async function saveAiLearningOverride(
 
   if (profileError || !profile) return { error: 'Profile not found' };
 
+  // ── Save learning ───────────────────────────────────────────────────────────
   try {
     await saveAiLearning(
       profile.id as string,
-      merchantKeyword,
-      userCategory,
-      userSubcategory,
-      isNeed,
-      aiSuggestedCategory,
+      validated.merchantKeyword,
+      validated.userCategory,
+      validated.userSubcategory,
+      validated.isNeed,
+      validated.aiSuggestedCategory,
     );
     return { success: true };
   } catch (e) {

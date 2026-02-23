@@ -1,10 +1,28 @@
 'use client';
 
+// ============================================================
+// KHARCHA — Analytics Page (Phase 8)
+// Month-navigable analytics dashboard with 6 chart components:
+//   1. CategoryPieChart    — spending breakdown donut
+//   2. NeedsVsWants        — horizontal stacked bar
+//   3. SpendingTrendLine   — 6-month line chart
+//   4. CalendarHeatmap     — daily spending calendar
+//   5. MonthComparison     — this vs last month bars
+//   6. AISummary           — Claude-generated insights
+// ============================================================
+
 import { useState } from 'react';
 import { format, addMonths, subMonths, parse } from 'date-fns';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useMonthlyAnalytics } from '@/hooks/useMonthlyAnalytics';
+import { useSpendingTrend } from '@/hooks/useSpendingTrend';
+import { CategoryPieChart } from '@/components/analytics/CategoryPieChart';
+import { SpendingTrendLine } from '@/components/analytics/SpendingTrendLine';
+import { CalendarHeatmap } from '@/components/analytics/CalendarHeatmap';
+import { NeedsVsWants } from '@/components/analytics/NeedsVsWants';
+import { MonthComparison } from '@/components/analytics/MonthComparison';
+import { AISummary } from '@/components/analytics/AISummary';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,71 +43,47 @@ function parseMonthYear(ym: string): Date {
   return parse(ym, 'yyyy-MM', new Date());
 }
 
-// ─── Month Navigator ─────────────────────────────────────────────────────────
+function prevMonthYear(ym: string): string {
+  return toMonthYear(subMonths(parseMonthYear(ym), 1));
+}
 
-function MonthNavigator({
-  monthYear,
-  onChange,
+// ─── Section wrapper ──────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  children,
 }: {
-  monthYear: string;
-  onChange: (ym: string) => void;
+  title: string;
+  children: React.ReactNode;
 }) {
-  const current = parseMonthYear(monthYear);
-  const now = new Date();
-  const isCurrentMonth = toMonthYear(current) === toMonthYear(now);
-
   return (
     <div
-      className="flex items-center justify-between"
-      style={{ padding: '0 var(--space-4)', marginBottom: 'var(--space-4)' }}
+      style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 12,
+        padding: '16px',
+      }}
     >
-      <button
-        onClick={() => onChange(toMonthYear(subMonths(current, 1)))}
-        className="flex items-center justify-center rounded-full"
+      <h3
+        className="font-body"
         style={{
-          width: 36,
-          height: 36,
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-default)',
+          fontSize: 12,
           color: 'var(--text-secondary)',
-          minWidth: 44,
-          minHeight: 44,
+          margin: '0 0 14px',
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          fontWeight: 600,
         }}
-        aria-label="Previous month"
       >
-        <ChevronLeft size={18} />
-      </button>
-
-      <h2
-        className="font-display text-center"
-        style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}
-      >
-        {format(current, 'MMMM yyyy')}
-      </h2>
-
-      <button
-        onClick={() => onChange(toMonthYear(addMonths(current, 1)))}
-        disabled={isCurrentMonth}
-        className="flex items-center justify-center rounded-full"
-        style={{
-          width: 36,
-          height: 36,
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-default)',
-          color: isCurrentMonth ? 'var(--text-secondary)' : 'var(--text-secondary)',
-          opacity: isCurrentMonth ? 0.35 : 1,
-          minWidth: 44,
-          minHeight: 44,
-        }}
-        aria-label="Next month"
-      >
-        <ChevronRight size={18} />
-      </button>
+        {title}
+      </h3>
+      {children}
     </div>
   );
 }
 
-// ─── Summary Cards ────────────────────────────────────────────────────────────
+// ─── Summary Card ─────────────────────────────────────────────────────────────
 
 function SummaryCard({
   label,
@@ -126,56 +120,65 @@ function SummaryCard({
   );
 }
 
-// ─── Category Row ─────────────────────────────────────────────────────────────
+// ─── Month Navigator ──────────────────────────────────────────────────────────
 
-function CategoryRow({
-  name,
-  amount,
-  percentage,
+function MonthNavigator({
+  monthYear,
+  onChange,
 }: {
-  name: string;
-  amount: number;
-  percentage: number;
+  monthYear: string;
+  onChange: (ym: string) => void;
 }) {
+  const current = parseMonthYear(monthYear);
+  const now = new Date();
+  const isCurrentMonth = toMonthYear(current) === toMonthYear(now);
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span
-          className="font-body truncate"
-          style={{ fontSize: 14, color: 'var(--text-primary)', maxWidth: '60%' }}
-        >
-          {name}
-        </span>
-        <div className="flex items-center gap-2">
-          <span
-            className="font-body"
-            style={{ fontSize: 12, color: 'var(--text-secondary)' }}
-          >
-            {percentage.toFixed(0)}%
-          </span>
-          <span
-            className="font-mono tabular-nums"
-            style={{ fontSize: 14, color: 'var(--color-expense)' }}
-          >
-            {formatAmount(amount)}
-          </span>
-        </div>
-      </div>
-      {/* Progress bar */}
-      <div
-        className="w-full overflow-hidden"
-        style={{ height: 4, borderRadius: 2, background: 'var(--border-default)' }}
+    <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-4)' }}>
+      <button
+        onClick={() => onChange(toMonthYear(subMonths(current, 1)))}
+        className="flex items-center justify-center rounded-full"
+        style={{
+          width: 36,
+          height: 36,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
+          color: 'var(--text-secondary)',
+          minWidth: 44,
+          minHeight: 44,
+          cursor: 'pointer',
+        }}
+        aria-label="Previous month"
       >
-        <div
-          style={{
-            height: '100%',
-            width: `${Math.min(percentage, 100)}%`,
-            background: 'var(--color-expense)',
-            borderRadius: 2,
-            opacity: 0.65,
-          }}
-        />
-      </div>
+        <ChevronLeft size={18} />
+      </button>
+
+      <h2
+        className="font-display text-center"
+        style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}
+      >
+        {format(current, 'MMMM yyyy')}
+      </h2>
+
+      <button
+        onClick={() => onChange(toMonthYear(addMonths(current, 1)))}
+        disabled={isCurrentMonth}
+        className="flex items-center justify-center rounded-full"
+        style={{
+          width: 36,
+          height: 36,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
+          color: 'var(--text-secondary)',
+          opacity: isCurrentMonth ? 0.35 : 1,
+          minWidth: 44,
+          minHeight: 44,
+          cursor: isCurrentMonth ? 'not-allowed' : 'pointer',
+        }}
+        aria-label="Next month"
+      >
+        <ChevronRight size={18} />
+      </button>
     </div>
   );
 }
@@ -184,31 +187,27 @@ function CategoryRow({
 
 function AnalyticsSkeleton() {
   return (
-    <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Summary row */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', gap: 12 }}>
         {[0, 1].map((i) => (
           <div
             key={i}
             className="flex-1"
-            style={{
-              height: 72,
-              borderRadius: 12,
-              background: 'var(--border-default)',
-              opacity: 0.5,
-            }}
+            style={{ height: 72, borderRadius: 12, background: 'var(--border-default)', opacity: 0.5 }}
           />
         ))}
       </div>
-      {/* Category rows */}
-      {[70, 50, 40, 30].map((w, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: `${w}%`, height: 14, borderRadius: 4, background: 'var(--border-default)', opacity: 0.5 }} />
-            <div style={{ width: 60, height: 14, borderRadius: 4, background: 'var(--border-default)', opacity: 0.5 }} />
-          </div>
-          <div style={{ height: 4, borderRadius: 2, background: 'var(--border-default)', opacity: 0.4 }} />
-        </div>
+      {[280, 120, 190, 200, 200, 100].map((h, i) => (
+        <div
+          key={i}
+          style={{
+            height: h,
+            borderRadius: 12,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-default)',
+            opacity: 0.6,
+          }}
+        />
       ))}
     </div>
   );
@@ -218,87 +217,116 @@ function AnalyticsSkeleton() {
 
 export default function AnalyticsPage() {
   const [monthYear, setMonthYear] = useState(() => toMonthYear(new Date()));
-  const { data, isLoading, error } = useMonthlyAnalytics(monthYear);
 
+  const prevMY = prevMonthYear(monthYear);
   const monthLabel = format(parseMonthYear(monthYear), 'MMMM');
+  const prevLabel = format(parseMonthYear(prevMY), 'MMM yyyy');
+
+  const { data, isLoading, error } = useMonthlyAnalytics(monthYear);
+  const { data: prevData } = useMonthlyAnalytics(prevMY);
+  const { data: trendData, isLoading: trendLoading } = useSpendingTrend(monthYear);
+
+  // vs-last-month delta for AISummary
+  const vsLastMonth =
+    data && prevData
+      ? {
+          expensesDelta: prevData.totalSpent - data.totalSpent, // positive = spent less
+          savingsDelta:
+            data.totalReceived - data.totalSpent - (prevData.totalReceived - prevData.totalSpent),
+        }
+      : null;
 
   return (
     <>
       <Header title="Analytics" />
 
       <div style={{ paddingBottom: 96 }}>
-        {/* ── Month navigator ─────────────────────────────────── */}
+        {/* ── Month navigator ───────────────────────────────── */}
         <div style={{ padding: 'var(--space-4) var(--space-4) 0' }}>
           <MonthNavigator monthYear={monthYear} onChange={setMonthYear} />
         </div>
 
         {isLoading ? (
-          <AnalyticsSkeleton />
+          <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <AnalyticsSkeleton />
+          </div>
         ) : error ? (
-          <div
-            style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}
-          >
+          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <p style={{ fontSize: 14 }}>Could not load analytics. Unlock the app first.</p>
           </div>
         ) : data ? (
-          <div style={{ padding: '0 var(--space-4)', display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* ── Summary: received + spent ────────────────────── */}
+          <div style={{ padding: '0 var(--space-4)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* ── Summary: received + spent ───────────────────── */}
             <div style={{ display: 'flex', gap: 12 }}>
               <SummaryCard
-                label={`Total received in ${monthLabel}`}
+                label={`Received in ${monthLabel}`}
                 amount={data.totalReceived}
                 color="var(--color-income)"
               />
               <SummaryCard
-                label={`Total spent in ${monthLabel}`}
+                label={`Spent in ${monthLabel}`}
                 amount={data.totalSpent}
                 color="var(--color-expense)"
               />
             </div>
 
-            {/* ── Category breakdown ───────────────────────────── */}
-            {data.categoryBreakdown.length > 0 ? (
-              <div
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 12,
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 16,
-                }}
-              >
-                <h3
-                  className="font-body"
-                  style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, letterSpacing: '0.04em', textTransform: 'uppercase' }}
-                >
-                  Spending breakdown
-                </h3>
-                {data.categoryBreakdown.map((cat) => (
-                  <CategoryRow
-                    key={cat.name}
-                    name={cat.name}
-                    amount={cat.amount}
-                    percentage={cat.percentage}
-                  />
-                ))}
-              </div>
-            ) : data.totalSpent === 0 ? (
-              <div
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 12,
-                  padding: '24px 16px',
-                  textAlign: 'center',
-                }}
-              >
-                <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                  No expenses recorded in {monthLabel}.
-                </p>
-              </div>
-            ) : null}
+            {/* ── 1. Category Pie Chart ────────────────────────── */}
+            {data.categoryBreakdown.length > 0 && (
+              <Section title="Spending Breakdown">
+                <CategoryPieChart data={data.categoryBreakdown} />
+              </Section>
+            )}
+
+            {/* ── 2. Needs vs Wants ────────────────────────────── */}
+            {data.totalSpent > 0 && (
+              <Section title="Needs vs Wants">
+                <NeedsVsWants
+                  needs={data.needsTotal}
+                  wants={data.wantsTotal}
+                />
+              </Section>
+            )}
+
+            {/* ── 3. 6-Month Trend ─────────────────────────────── */}
+            <Section title="6-Month Spending Trend">
+              <SpendingTrendLine
+                data={trendData ?? []}
+                isLoading={trendLoading}
+              />
+            </Section>
+
+            {/* ── 4. Calendar Heatmap ──────────────────────────── */}
+            <Section title="Daily Spending">
+              <CalendarHeatmap
+                data={data.dailyBreakdown}
+                monthYear={monthYear}
+              />
+            </Section>
+
+            {/* ── 5. Month Comparison ──────────────────────────── */}
+            <Section title={`${monthLabel} vs ${prevLabel}`}>
+              <MonthComparison
+                current={data.categoryBreakdown}
+                previous={prevData?.categoryBreakdown ?? []}
+                currentLabel={monthLabel}
+                previousLabel={prevLabel}
+              />
+            </Section>
+
+            {/* ── 6. AI Summary ────────────────────────────────── */}
+            <Section title="AI Insights">
+              <AISummary
+                monthYear={monthYear}
+                totalIncome={data.totalReceived}
+                totalExpenses={data.totalSpent}
+                subscriptionTotal={data.subscriptionTotal}
+                needsTotal={data.needsTotal}
+                wantsTotal={data.wantsTotal}
+                categoryBreakdown={data.categoryBreakdown}
+                vsLastMonth={vsLastMonth}
+              />
+            </Section>
 
             {/* ── Cross-month income footnote ──────────────────── */}
             {data.crossMonthIncome.length > 0 && (
@@ -313,11 +341,7 @@ export default function AnalyticsPage() {
                   alignItems: 'flex-start',
                 }}
               >
-                <Info
-                  size={15}
-                  color="var(--color-accent)"
-                  style={{ flexShrink: 0, marginTop: 2 }}
-                />
+                <Info size={15} color="var(--color-accent)" style={{ flexShrink: 0, marginTop: 2 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {data.crossMonthIncome.map((entry, i) => {
                     const targetLabel = format(parseMonthYear(entry.targetMonth), 'MMM yyyy');
@@ -335,6 +359,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             )}
+
           </div>
         ) : null}
       </div>

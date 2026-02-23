@@ -20,33 +20,9 @@ import { createClient } from '@/lib/supabase/server';
 import { parseSMS }       from '@/lib/algorithms/sms-parser';
 import { parseSMSWithAI } from '@/lib/ai/parse-sms';
 import { checkAnomaly }   from '@/lib/algorithms/anomaly-detector';
+import { checkRateLimit as checkRL, getClientIP, RATE_LIMIT_WEBHOOK } from '@/lib/rate-limiter';
+import { sanitizeSMS } from '@/lib/sanitize';
 import type { NotificationCreate } from '@/types';
-
-// ── Rate limiter (IP-based — no user session here) ────────────────────────────
-
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT  = 30;
-const WINDOW_MS   = 60_000;
-
-function getClientIP(req: NextRequest): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
-  );
-}
-
-function checkRateLimit(ip: string): boolean {
-  const now    = Date.now();
-  const prev   = rateLimitMap.get(ip) ?? [];
-  const recent = prev.filter((t) => now - t < WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT) return false;
-
-  recent.push(now);
-  rateLimitMap.set(ip, recent);
-  return true;
-}
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
@@ -56,25 +32,13 @@ const bodySchema = z.object({
   secret: z.string().min(1, 'Secret required'),
 }).strict();
 
-// ── SMS sanitization (strip HTML/script tags) ─────────────────────────────────
-
-function sanitizeSMS(raw: string): string {
-  return raw
-    .replace(/<[^>]*>/g, '')        // strip HTML tags
-    .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, ' ') // keep printable chars
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, 500);             // max SMS length for processing
-}
-
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // ── Rate limit (before any DB work) ────────────────────────────────────────
+  // ── Rate limit (30 req/min per IP — no auth session) ───────────────────────
   const ip = getClientIP(req);
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: 'Rate limited' }, { status: 429 });
-  }
+  const blocked = checkRL(ip, 'webhook-tasker', RATE_LIMIT_WEBHOOK);
+  if (blocked) return blocked;
 
   // ── Body validation ─────────────────────────────────────────────────────────
   let body: unknown;

@@ -15,6 +15,7 @@ import { createTransactionSchema, updateTransactionSchema } from '@/lib/validati
 import type { CreateTransactionInput } from '@/lib/validations';
 import type { Transaction, SubscriptionMatchResult, NotificationCreate } from '@/types';
 import { checkAnomaly, anomaliesToNotifications } from '@/lib/algorithms/anomaly-detector';
+import { sanitizeText } from '@/lib/sanitize';
 
 // ============================================================
 // CONSTANTS
@@ -402,7 +403,12 @@ export async function getTransactions(
     }
 
     if (search && search.trim().length > 0) {
-      const term = search.trim();
+      // Sanitize + escape PostgreSQL ilike special characters (%, _, \)
+      const sanitized = sanitizeText(search);
+      const term = sanitized
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_');
       // Search description OR merchant (case-insensitive)
       query = query.or(
         `description.ilike.%${term}%,merchant.ilike.%${term}%`,

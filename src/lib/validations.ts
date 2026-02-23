@@ -2,9 +2,13 @@
 // KHARCHA — Centralized Zod Validation Schemas
 // Every server action and API route validates through these.
 // See: MASTER_PROJECT_DOCUMENT.md Section 6.6
+//
+// All user-facing text fields include sanitizeText() transforms
+// to strip HTML tags and prevent XSS.
 // ============================================================
 
 import { z } from 'zod';
+import { sanitizeText, sanitizeMultiLineText } from '@/lib/sanitize';
 
 // ============================================================
 // SHARED FIELD SCHEMAS
@@ -46,6 +50,20 @@ const uuidField = z.string().uuid();
 /** Currency enum */
 const currencyField = z.enum(['INR', 'USD']);
 
+// ── Sanitized text fields ────────────────────────────────────────────────────
+
+/** Single-line text field with HTML sanitization */
+const textField = (maxLen: number) =>
+  z.string().trim().max(maxLen).transform(sanitizeText);
+
+/** Single-line text field requiring min 1 char after sanitization */
+const requiredTextField = (minLen: number, maxLen: number, msg?: string) =>
+  z.string().trim().min(minLen, msg).max(maxLen).transform(sanitizeText);
+
+/** Multi-line text field with HTML sanitization (preserves newlines) */
+const multiLineTextField = (maxLen: number) =>
+  z.string().trim().max(maxLen).transform(sanitizeMultiLineText);
+
 // ============================================================
 // 1. PIN SCHEMA
 // ============================================================
@@ -74,8 +92,8 @@ export const createTransactionSchema = z.object({
   amount_hash: hashField,
   currency: currencyField.default('INR'),
   category_id: uuidField.optional(),
-  description: z.string().trim().min(1, 'Description required').max(200),
-  merchant: z.string().trim().max(100).optional(),
+  description: requiredTextField(1, 200, 'Description required'),
+  merchant: textField(100).optional(),
   is_pass_through: z.boolean().default(false),
   linked_income_id: uuidField.optional(),
   is_need: z.boolean().default(true),
@@ -99,8 +117,8 @@ export const updateTransactionSchema = z.object({
   amount_hash: hashField.optional(),
   currency: currencyField.optional(),
   category_id: uuidField.nullable().optional(),
-  description: z.string().trim().min(1).max(200).optional(),
-  merchant: z.string().trim().max(100).nullable().optional(),
+  description: requiredTextField(1, 200).optional(),
+  merchant: textField(100).nullable().optional(),
   is_pass_through: z.boolean().optional(),
   linked_income_id: uuidField.nullable().optional(),
   is_need: z.boolean().optional(),
@@ -129,8 +147,8 @@ export const createIncomeSchema = z.object({
     'vault_replenish',
     'other',
   ]),
-  description: z.string().trim().max(200).optional(),
-  pass_through_for: z.string().trim().max(200).optional(),
+  description: textField(200).optional(),
+  pass_through_for: textField(200).optional(),
   date: dateField.optional(),
   target_month: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-MM').nullable().optional(),
 }).strict();
@@ -146,14 +164,14 @@ export type CreateIncomeInput = z.infer<typeof createIncomeSchema>;
  * Amount is encrypted; billing_day is the day-of-month for matching.
  */
 export const createSubscriptionSchema = z.object({
-  name: z.string().trim().min(1, 'Name required').max(100),
+  name: requiredTextField(1, 100, 'Name required'),
   amount_encrypted: encryptedField,
   currency: currencyField,
   billing_day: z.number().int().min(1).max(31),
   billing_cycle: z.enum(['monthly', 'yearly']).default('monthly'),
   category_id: uuidField.optional(),
   auto_match_keywords: z
-    .array(z.string().trim().max(50))
+    .array(z.string().trim().max(50).transform(sanitizeText))
     .max(10)
     .optional(),
   remind_days_before: z.number().int().min(0).max(14).default(3),
@@ -167,7 +185,7 @@ export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
  * `id` is passed separately to the server action.
  */
 export const updateSubscriptionSchema = z.object({
-  name: z.string().trim().min(1).max(100).optional(),
+  name: requiredTextField(1, 100).optional(),
   amount_encrypted: encryptedField.optional(),
   amount_inr_encrypted: encryptedField.nullable().optional(),
   currency: z.enum(['INR', 'USD']).optional(),
@@ -177,9 +195,9 @@ export const updateSubscriptionSchema = z.object({
   is_active: z.boolean().optional(),
   next_billing_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').nullable().optional(),
   last_paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').nullable().optional(),
-  auto_match_keywords: z.array(z.string().trim().max(50)).max(10).nullable().optional(),
+  auto_match_keywords: z.array(z.string().trim().max(50).transform(sanitizeText)).max(10).nullable().optional(),
   remind_days_before: z.number().int().min(0).max(14).optional(),
-  notes: z.string().trim().max(500).nullable().optional(),
+  notes: multiLineTextField(500).nullable().optional(),
 }).strict();
 
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
@@ -210,7 +228,7 @@ export const vaultTransactionSchema = z.object({
   type: z.enum(['deposit', 'withdrawal']),
   amount_encrypted: encryptedField,
   amount_hash: hashField,
-  reason: z.string().trim().min(1, 'Reason required').max(200),
+  reason: requiredTextField(1, 200, 'Reason required'),
 }).strict();
 
 export type VaultTransactionInput = z.infer<typeof vaultTransactionSchema>;
@@ -224,7 +242,7 @@ export type VaultTransactionInput = z.infer<typeof vaultTransactionSchema>;
  * Only the fields the user can change from the settings page.
  */
 export const profileUpdateSchema = z.object({
-  display_name: z.string().trim().min(1).max(50).optional(),
+  display_name: requiredTextField(1, 50).optional(),
   monthly_budget_alert_pct: z.number().int().min(50).max(100).optional(),
   daily_limit_enabled: z.boolean().optional(),
   notification_enabled: z.boolean().optional(),
@@ -242,8 +260,8 @@ export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
  * Color: hex color for the category badge.
  */
 export const categorySchema = z.object({
-  name: z.string().trim().min(1, 'Name required').max(50),
-  icon: z.string().trim().min(1).max(50),
+  name: requiredTextField(1, 50, 'Name required'),
+  icon: z.string().trim().min(1).max(50).transform(sanitizeText),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a hex code like #A37B6F'),
 }).strict();
 

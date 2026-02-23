@@ -13,6 +13,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit, RATE_LIMIT_GENERAL } from '@/lib/rate-limiter';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,10 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
+
+    // ── Rate limit (60 req/min per user) ─────────────────────
+    const blocked = checkRateLimit(userId, 'exchange-rate', RATE_LIMIT_GENERAL);
+    if (blocked) return blocked;
 
     const supabase = await createClient();
 

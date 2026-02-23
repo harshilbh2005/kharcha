@@ -14,26 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { generateMonthlySummary } from '@/lib/ai/monthly-summary';
-
-// ── Rate limiter (5/hour per user) ────────────────────────────────────────────
-
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT  = 5;
-const WINDOW_MS   = 60 * 60_000; // 1 hour
-
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now    = Date.now();
-  const prev   = rateLimitMap.get(userId) ?? [];
-  const recent = prev.filter((t) => now - t < WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  recent.push(now);
-  rateLimitMap.set(userId, recent);
-  return { allowed: true, remaining: RATE_LIMIT - recent.length };
-}
+import { checkRateLimit, RATE_LIMIT_AI } from '@/lib/rate-limiter';
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
 
@@ -75,14 +56,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
 
-    // ── Rate limit ────────────────────────────────────────────────────────────
-    const { allowed, remaining } = checkRateLimit(userId);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Summaries are limited to 5 per hour.' },
-        { status: 429, headers: { 'X-RateLimit-Remaining': '0' } },
-      );
-    }
+    // ── Rate limit (10 req/min per user — AI endpoint) ────────────────────────
+    const blocked = checkRateLimit(userId, 'ai-monthly-summary', RATE_LIMIT_AI);
+    if (blocked) return blocked;
 
     // ── Body validation ───────────────────────────────────────────────────────
     let body: unknown;
@@ -122,9 +98,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(result, {
-      headers: { 'X-RateLimit-Remaining': String(remaining) },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('[/api/ai/monthly-summary] unexpected error:', error);
     return NextResponse.json(

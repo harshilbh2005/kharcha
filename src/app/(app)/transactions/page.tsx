@@ -292,8 +292,8 @@ export default function TransactionsPage() {
               onClick={handleToggleSearch}
               className="flex items-center justify-center rounded-full transition-colors"
               style={{
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 color: showSearch
                   ? "var(--color-accent)"
                   : "var(--text-secondary)",
@@ -313,8 +313,8 @@ export default function TransactionsPage() {
               onClick={() => setShowFilters((f) => !f)}
               className="relative flex items-center justify-center rounded-full transition-colors"
               style={{
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 color: showFilters
                   ? "var(--color-accent)"
                   : "var(--text-secondary)",

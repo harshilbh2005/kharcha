@@ -54,9 +54,9 @@ export const viewport: Viewport = {
   themeColor:    "#8B7355",
   width:         "device-width",
   initialScale:  1,
-  maximumScale:  1,
-  // Disable pinch-zoom — numbers/amounts are always readable at base scale
-  userScalable:  false,
+  maximumScale:  5,
+  // Allow pinch-zoom for accessibility (Lighthouse requires it)
+  userScalable:  true,
 };
 
 // ─── RootLayout ─────────────────────────────────────────────────────────────────

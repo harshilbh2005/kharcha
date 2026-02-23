@@ -115,8 +115,8 @@ export default function DashboardPage() {
             aria-label="Notifications"
             className="flex items-center justify-center rounded-full"
             style={{
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',

@@ -15,6 +15,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit, RATE_LIMIT_GENERAL } from '@/lib/rate-limiter';
 import type { IncomeType, MonthlyAnalyticsQueryResult } from '@/types';
 
 export async function GET(
@@ -27,6 +28,10 @@ export async function GET(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
+
+    // ── Rate limit (60 req/min per user) ─────────────────────
+    const blocked = checkRateLimit(userId, 'analytics-monthly', RATE_LIMIT_GENERAL);
+    if (blocked) return blocked;
 
     // ── Validate param ───────────────────────────────────────
     const { monthYear } = await params;
@@ -74,7 +79,7 @@ export async function GET(
     // ── Expenses: filtered by date in month, exclude pass-through ──
     const { data: expenseRows, error: expenseError } = await supabase
       .from('transactions')
-      .select('amount_encrypted, category_name, category_id, is_subscription')
+      .select('amount_encrypted, category_name, category_id, is_subscription, is_need, date')
       .eq('profile_id', profile.id)
       .gte('date', monthStart)
       .lte('date', monthEnd)
@@ -99,6 +104,8 @@ export async function GET(
         category_name: (row.category_name as string | null) ?? null,
         category_id: (row.category_id as string | null) ?? null,
         is_subscription: row.is_subscription as boolean,
+        is_need: row.is_need as boolean,
+        date: row.date as string,
       })),
     };
 

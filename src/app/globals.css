@@ -224,6 +224,11 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* === COLOR SCHEME (light-only — tells browser to avoid dark form controls) === */
+:root {
+  color-scheme: light;
+}
+
 /* === PAPER TEXTURE OVERLAY (CSS noise — no image needed) === */
 body {
   background-color: var(--bg-global);

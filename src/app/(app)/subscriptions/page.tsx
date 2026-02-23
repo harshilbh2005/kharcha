@@ -180,8 +180,8 @@ export default function SubscriptionsPage() {
             whileTap={{ scale: 0.9 }}
             aria-label="Add subscription"
             style={{
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',

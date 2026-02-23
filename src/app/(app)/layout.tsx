@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import { getProfile } from '@/lib/auth';
 import AuthGate from '@/components/layout/AuthGate';
 import { BottomNavWrapper } from '@/components/layout/BottomNavWrapper';
+import { OfflineIndicator } from '@/components/layout/OfflineIndicator';
 
 export default async function AppLayout({
   children,
@@ -25,6 +26,8 @@ export default async function AppLayout({
 
   return (
     <AuthGate pinEnabled={profile.pin_enabled}>
+      {/* Slim offline/syncing banner — client component, renders nothing when online */}
+      <OfflineIndicator />
       {children}
       <BottomNavWrapper />
     </AuthGate>

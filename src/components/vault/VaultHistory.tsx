@@ -78,11 +78,43 @@ function VaultHistoryItem({ tx }: { tx: VaultTransactionDecrypted }) {
 export function VaultHistory({ transactions }: VaultHistoryProps) {
   if (transactions.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center py-8 font-body text-sm"
-        style={{ color: 'var(--text-secondary)' }}
-      >
-        No vault transactions yet
+      <div className="flex flex-col items-center justify-center py-10 gap-3">
+        {/* Vault/shield illustration */}
+        <svg
+          width="56"
+          height="56"
+          viewBox="0 0 56 56"
+          fill="none"
+          aria-hidden="true"
+          style={{ opacity: 0.22 }}
+        >
+          <path
+            d="M28 6 L8 16 V30 C8 42 28 50 28 50 C28 50 48 42 48 30 V16 Z"
+            stroke="var(--text-primary)"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <path
+            d="M20 28 L26 34 L36 22"
+            stroke="var(--text-primary)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <p
+          className="font-body text-sm text-center"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          No vault transactions yet
+        </p>
+        <p
+          className="font-body text-xs text-center"
+          style={{ color: 'var(--text-secondary)', opacity: 0.7, maxWidth: 200, lineHeight: 1.5 }}
+        >
+          Deposits and withdrawals will appear here.
+        </p>
       </div>
     );
   }

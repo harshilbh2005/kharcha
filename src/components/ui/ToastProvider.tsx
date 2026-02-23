@@ -87,6 +87,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         Desktop : sm:left-auto sm:right-4  → top-right corner, fixed width
       */}
       <div
+        role="status"
         aria-live="polite"
         aria-label="Notifications"
         className={[

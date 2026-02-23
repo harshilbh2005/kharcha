@@ -4,7 +4,8 @@
 // KHARCHA — useMonthlyAnalytics Hook
 // Fetches encrypted analytics for a calendar month from
 // /api/analytics/monthly/[monthYear], decrypts amounts, and
-// computes derived values (totals, category breakdown, footnotes).
+// computes derived values (totals, category breakdown, footnotes,
+// needs vs wants, and daily spending breakdown).
 // ============================================================
 
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +20,12 @@ export interface CategoryBreakdown {
   /** 0–100 share of total spending */
   percentage: number;
   isSubscription: boolean;
+}
+
+/** Daily spending total for the heatmap */
+export interface DailySpending {
+  date: string; // "YYYY-MM-DD"
+  amount: number;
 }
 
 /** Income entry where the allowance covers a different month than it was received */
@@ -37,6 +44,14 @@ export interface MonthlyAnalyticsData {
   categoryBreakdown: CategoryBreakdown[];
   /** Non-empty when any income entry covers a different month than received */
   crossMonthIncome: CrossMonthIncome[];
+  /** Amount spent on "needs" (is_need = true) */
+  needsTotal: number;
+  /** Amount spent on "wants" (is_need = false) */
+  wantsTotal: number;
+  /** Per-day spending totals for the calendar heatmap */
+  dailyBreakdown: DailySpending[];
+  /** Total from subscription expenses only */
+  subscriptionTotal: number;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -96,7 +111,6 @@ export function useMonthlyAnalytics(monthYear: string) {
         .sort((a, b) => b.amount - a.amount);
 
       // ── 5. Cross-month income (for footnote) ─────────────────
-      // These are entries where target_month ≠ the month the money arrived.
       const crossMonthIncome: CrossMonthIncome[] = raw.income
         .map((entry, i) => ({ entry, amount: incomeAmounts[i] }))
         .filter(
@@ -109,12 +123,43 @@ export function useMonthlyAnalytics(monthYear: string) {
           amount,
         }));
 
+      // ── 6. Needs vs Wants ────────────────────────────────────
+      let needsTotal = 0;
+      let wantsTotal = 0;
+      raw.expenses.forEach((exp, i) => {
+        if (exp.is_need) {
+          needsTotal += expenseAmounts[i];
+        } else {
+          wantsTotal += expenseAmounts[i];
+        }
+      });
+
+      // ── 7. Daily breakdown (for heatmap) ─────────────────────
+      const dayMap = new Map<string, number>();
+      raw.expenses.forEach((exp, i) => {
+        const day = exp.date.slice(0, 10); // "YYYY-MM-DD"
+        dayMap.set(day, (dayMap.get(day) ?? 0) + expenseAmounts[i]);
+      });
+      const dailyBreakdown: DailySpending[] = Array.from(dayMap.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // ── 8. Subscription total ────────────────────────────────
+      const subscriptionTotal = raw.expenses.reduce(
+        (sum, exp, i) => sum + (exp.is_subscription ? expenseAmounts[i] : 0),
+        0,
+      );
+
       return {
         monthYear,
         totalReceived,
         totalSpent,
         categoryBreakdown,
         crossMonthIncome,
+        needsTotal,
+        wantsTotal,
+        dailyBreakdown,
+        subscriptionTotal,
       };
     },
     enabled: isUnlocked && monthYear.length === 7,

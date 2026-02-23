@@ -86,9 +86,9 @@ export function Header({
             whileTap={{ scale: 0.90 }}
             aria-label="Go back"
             style={{
-              // 40 px touch target, visually smaller
-              width:  40,
-              height: 40,
+              // 44 px minimum tap target (WCAG)
+              width:  44,
+              height: 44,
               borderRadius: "50%",
               display:        "flex",
               alignItems:     "center",

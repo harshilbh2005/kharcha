@@ -14,30 +14,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { categorizeTransaction } from '@/lib/ai/categorize';
-
-// ── In-memory rate limiter (per user, sliding window) ─────────────────────────
-//
-// For a single-user personal app running on a long-lived server process, an
-// in-memory Map is sufficient.  In serverless deployments each cold start
-// resets the counter, which provides a very generous limit in practice.
-//
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT  = 10;
-const WINDOW_MS   = 60_000; // 1 minute
-
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const prev = rateLimitMap.get(userId) ?? [];
-  const recent = prev.filter((t) => now - t < WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  recent.push(now);
-  rateLimitMap.set(userId, recent);
-  return { allowed: true, remaining: RATE_LIMIT - recent.length };
-}
+import { checkRateLimit, RATE_LIMIT_AI } from '@/lib/rate-limiter';
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
@@ -59,14 +36,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
 
-    // ── Rate limit ────────────────────────────────────────────────────────────
-    const { allowed, remaining } = checkRateLimit(userId);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Try again in a minute.' },
-        { status: 429, headers: { 'X-RateLimit-Remaining': '0' } },
-      );
-    }
+    // ── Rate limit (10 req/min per user — AI endpoint) ────────────────────────
+    const blocked = checkRateLimit(userId, 'ai-categorize', RATE_LIMIT_AI);
+    if (blocked) return blocked;
 
     // ── Body validation ───────────────────────────────────────────────────────
     let body: unknown;
@@ -106,9 +78,7 @@ export async function POST(req: NextRequest) {
       currency,
     );
 
-    return NextResponse.json(result, {
-      headers: { 'X-RateLimit-Remaining': String(remaining) },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('[/api/ai/categorize] unexpected error:', error);
     return NextResponse.json(

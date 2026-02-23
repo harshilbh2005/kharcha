@@ -45,10 +45,11 @@ export default function VaultPage() {
         rightElement={
           <div
             aria-label="Vault secured"
+            role="img"
             className="flex items-center justify-center"
             style={{
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               color: 'var(--color-vault)',
             }}
           >
