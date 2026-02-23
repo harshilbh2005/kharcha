@@ -51,6 +51,9 @@ export interface BudgetInput {
   /** Amount spent today specifically — used for todayRemaining calculation */
   todayExpenses: number;
 
+  /** Amount spent yesterday — used to compute unused-budget carryover to today */
+  yesterdayExpenses: number;
+
   /** Unpaid subscriptions expected to bill before the budget horizon */
   expectedSubscriptions: number;
 
@@ -111,6 +114,12 @@ export interface BudgetResult {
 
   /** dailyLimit − todayExpenses, floored at 0 */
   todayRemaining: number;
+
+  /**
+   * Unspent amount carried over from yesterday's daily allowance.
+   * 0 when yesterday was overspent.
+   */
+  carryover: number;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
@@ -246,6 +255,7 @@ export function calculateBudget(input: BudgetInput): BudgetResult {
     totalIncome,
     totalExpenses,
     todayExpenses,
+    yesterdayExpenses,
     expectedSubscriptions,
     latestTargetMonth,
     isWeekend,
@@ -292,10 +302,14 @@ export function calculateBudget(input: BudgetInput): BudgetResult {
     totalIncome - totalExpenses - expectedSubscriptions,
   );
 
-  // ── 4. Daily limit ──────────────────────────────────────────────────────────
-  // Spread remaining balance evenly, boost on weekends, enforce floor.
+  // Start-of-day balance: what was available BEFORE today's spending.
+  // This keeps the daily limit headline stable throughout the day.
+  const startOfDayBalance = availableBalance + todayExpenses;
 
-  let dailyLimit = availableBalance / daysRemaining;
+  // ── 4. Daily limit ──────────────────────────────────────────────────────────
+  // Based on start-of-day balance so the headline doesn't drop as you spend.
+
+  let dailyLimit = startOfDayBalance / daysRemaining;
 
   if (isWeekend) {
     dailyLimit *= WEEKEND_MULTIPLIER;
@@ -342,11 +356,29 @@ export function calculateBudget(input: BudgetInput): BudgetResult {
     }
   }
 
-  // ── 7. Today remaining ──────────────────────────────────────────────────────
+  // ── 7. Yesterday carryover ──────────────────────────────────────────────────
+  // If yesterday's daily allowance wasn't fully spent, the surplus rolls over
+  // to boost today's effective limit.
+  //
+  // Yesterday's start-of-day balance = startOfDayBalance + yesterdayExpenses
+  //   (what was available at the START of yesterday, before yesterday's spending)
 
-  const todayRemaining = Math.max(0, dailyLimit - todayExpenses);
+  const yesterdayAvailBalance = startOfDayBalance + yesterdayExpenses;
+  const yesterdayDaysRemaining = daysRemaining + 1;
+  const yesterdayBaseLimit = Math.max(
+    DAILY_LIMIT_FLOOR,
+    yesterdayAvailBalance / yesterdayDaysRemaining,
+  );
+  const carryover = Math.max(0, yesterdayBaseLimit - yesterdayExpenses);
 
-  // ── 8. Weekly budget ────────────────────────────────────────────────────────
+  // Effective daily limit = base limit + carryover from yesterday
+  const effectiveDailyLimit = dailyLimit + carryover;
+
+  // ── 8. Today remaining ──────────────────────────────────────────────────────
+
+  const todayRemaining = Math.max(0, effectiveDailyLimit - todayExpenses);
+
+  // ── 9. Weekly budget ────────────────────────────────────────────────────────
   // Capped at available balance so it never exceeds what's actually there.
 
   const weeklyBudget = Math.round(
@@ -359,13 +391,14 @@ export function calculateBudget(input: BudgetInput): BudgetResult {
     availableBalance: Math.round(availableBalance),
     budgetHorizon,
     daysRemaining,
-    dailyLimit: Math.round(dailyLimit),
+    dailyLimit: Math.round(effectiveDailyLimit),
     weeklyBudget,
     burnRate: Math.round(burnRate * 100) / 100,
     burnStatus,
     projectedEndBalance: Math.round(projectedEndBalance),
     daysUntilBroke,
     todayRemaining: Math.round(todayRemaining),
+    carryover: Math.round(carryover),
   };
 }
 
@@ -398,6 +431,7 @@ export function emptyBudgetInput(): BudgetInput {
     totalIncome: 0,
     totalExpenses: 0,
     todayExpenses: 0,
+    yesterdayExpenses: 0,
     expectedSubscriptions: 0,
     latestTargetMonth: null,
     isWeekend: dayOfWeek === 0 || dayOfWeek === 6,

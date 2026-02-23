@@ -25,6 +25,10 @@ export interface DashboardBudget extends BudgetResult {
   totalSpent: number;
   /** Upcoming subscription costs reserved from available balance */
   expectedSubscriptions: number;
+  /** Total expenses in the rolling 7-day window (for weekly spent display) */
+  weeklySpent: number;
+  /** Date the budget period started (earliest income entry, YYYY-MM-DD) */
+  budgetStartDate: string | null;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -49,7 +53,7 @@ export function useBudget() {
       const raw: BudgetQueryResult = await res.json();
 
       // ── 2. Decrypt all amounts in parallel ──────────────────
-      const [incomeAmounts, expenseAmounts, todayAmounts, subAmounts] = await Promise.all([
+      const [incomeAmounts, expenseAmounts, todayAmounts, yesterdayAmounts, weekAmounts, subAmounts] = await Promise.all([
         raw.total_income.length > 0
           ? decryptMany(raw.total_income.map((i) => i.amount))
           : Promise.resolve([] as number[]),
@@ -58,6 +62,12 @@ export function useBudget() {
           : Promise.resolve([] as number[]),
         raw.today_expenses.length > 0
           ? decryptMany(raw.today_expenses.map((e) => e.amount))
+          : Promise.resolve([] as number[]),
+        raw.yesterday_expenses.length > 0
+          ? decryptMany(raw.yesterday_expenses.map((e) => e.amount))
+          : Promise.resolve([] as number[]),
+        raw.week_expenses.length > 0
+          ? decryptMany(raw.week_expenses.map((e) => e.amount))
           : Promise.resolve([] as number[]),
         raw.expected_subscriptions.length > 0
           ? decryptMany(raw.expected_subscriptions.map((s) => s.amount))
@@ -68,6 +78,8 @@ export function useBudget() {
       const totalIncome = incomeAmounts.reduce((sum, a) => sum + a, 0);
       const totalExpenses = expenseAmounts.reduce((sum, a) => sum + a, 0);
       const todayExpenses = todayAmounts.reduce((sum, a) => sum + a, 0);
+      const yesterdayExpenses = yesterdayAmounts.reduce((sum, a) => sum + a, 0);
+      const weeklySpent = weekAmounts.reduce((sum, a) => sum + a, 0);
       const expectedSubscriptions = subAmounts.reduce((sum, a) => sum + a, 0);
 
       // ── 4. Weekend check ────────────────────────────────────
@@ -79,6 +91,7 @@ export function useBudget() {
         totalIncome,
         totalExpenses,
         todayExpenses,
+        yesterdayExpenses,
         expectedSubscriptions,
         latestTargetMonth: raw.latest_target_month,
         isWeekend,
@@ -91,6 +104,8 @@ export function useBudget() {
         totalBudget: totalIncome,
         totalSpent: totalExpenses,
         expectedSubscriptions,
+        weeklySpent: Math.round(weeklySpent),
+        budgetStartDate: raw.budget_start_date,
       };
     },
     enabled: isUnlocked,

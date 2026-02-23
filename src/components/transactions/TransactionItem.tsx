@@ -40,6 +40,21 @@ function formatTime(time: string | null): string {
   return `${h}:${m} ${ampm}`;
 }
 
+/** Extract a display time from a Supabase ISO timestamp (uses local timezone) */
+function formatCreatedAtTime(createdAt: string): string {
+  try {
+    const d = new Date(createdAt);
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const h = hours % 12 || 12;
+    const m = String(minutes).padStart(2, "0");
+    const ampm = hours < 12 ? "am" : "pm";
+    return `${h}:${m} ${ampm}`;
+  } catch {
+    return "";
+  }
+}
+
 // ─── Swipe-to-delete threshold (px) ──────────────────────────────────────────
 
 const DELETE_THRESHOLD = -80;
@@ -116,6 +131,11 @@ export function TransactionItem({
   const amountColor = isIncome ? "var(--color-income)" : "var(--color-expense)";
   const amountStr   = (isIncome ? "+" : "−") + formatAmount(Math.abs(transaction.amount));
 
+  // Time to display: explicit time field first, fallback to created_at time
+  const displayTime = transaction.time
+    ? formatTime(transaction.time)
+    : formatCreatedAtTime(transaction.created_at);
+
   // Show "For Mon YYYY" badge when income covers a different month than received
   const showTargetBadge =
     isIncome &&
@@ -155,8 +175,8 @@ export function TransactionItem({
           style={{
             x: dragX,
             touchAction: "pan-y",
-            paddingTop: 12,
-            paddingBottom: 12,
+            paddingTop: 14,
+            paddingBottom: 14,
             backgroundColor: "var(--bg-surface)",
             borderBottom: isLast ? "none" : "1px solid var(--border-default)",
           }}
@@ -219,12 +239,12 @@ export function TransactionItem({
                 {amountStr}
               </span>
             </div>
-            {transaction.time && (
+            {displayTime && (
               <span
                 className="text-xs tabular-nums"
                 style={{ color: "var(--text-secondary)" }}
               >
-                {formatTime(transaction.time)}
+                {displayTime}
               </span>
             )}
             {showTargetBadge && (

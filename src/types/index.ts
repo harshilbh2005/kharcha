@@ -498,6 +498,7 @@ export interface BudgetInput {
   totalIncome: number;
   totalExpenses: number;
   todayExpenses: number;
+  yesterdayExpenses: number;
   expectedSubscriptions: number;
   latestTargetMonth: string | null;
   isWeekend: boolean;
@@ -514,6 +515,7 @@ export interface BudgetResult {
   projectedEndBalance: number;
   daysUntilBroke: number | null;
   todayRemaining: number;
+  carryover: number;
 }
 
 // ============================================================
@@ -566,8 +568,14 @@ export interface BudgetQueryResult {
   total_expenses: Array<{ amount: string; category: string | null }>;
   /** Today's expenses only (encrypted amounts) — for todayRemaining */
   today_expenses: Array<{ amount: string }>;
+  /** Yesterday's expenses only (encrypted amounts) — for carryover calculation */
+  yesterday_expenses: Array<{ amount: string }>;
+  /** Rolling 7-day expenses (encrypted amounts) — for weekly spent display */
+  week_expenses: Array<{ amount: string }>;
   /** Furthest target_month from income entries, e.g. "2026-03", or null */
   latest_target_month: string | null;
+  /** Earliest income entry date (YYYY-MM-DD) — when the budget period started */
+  budget_start_date: string | null;
   /** Encrypted amounts for unpaid subscriptions due before horizon */
   expected_subscriptions: Array<{ amount: string; name: string }>;
 }

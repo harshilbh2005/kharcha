@@ -151,6 +151,7 @@ export default function DashboardPage() {
               <DailyLimitCard
                 dailyLimit={Math.round(budget?.dailyLimit ?? 0)}
                 weeklyBudget={Math.round(budget?.weeklyBudget ?? 0)}
+                weeklySpent={Math.round(budget?.weeklySpent ?? 0)}
                 burnStatus={budget?.burnStatus ?? 'safe'}
                 todayRemaining={Math.round(budget?.todayRemaining ?? 0)}
                 daysUntilBroke={budget?.daysUntilBroke ?? null}
@@ -163,12 +164,12 @@ export default function DashboardPage() {
             </div>
 
             {/* ── Budget period context line ──────────────────────────────── */}
-            {budget?.budgetHorizon && (
+            {budget?.budgetHorizon && budget?.budgetStartDate && (
               <p
                 className="text-xs text-center -mt-1"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                Budget period: {format(new Date(), 'MMM d')}
+                Budget period: {format(new Date(budget.budgetStartDate + 'T00:00:00'), 'MMM d')}
                 {' → '}
                 {format(budget.budgetHorizon, 'MMM d')}
               </p>

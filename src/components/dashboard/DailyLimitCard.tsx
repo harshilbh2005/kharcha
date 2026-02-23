@@ -9,10 +9,12 @@ import type { BurnStatus } from '@/types';
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface DailyLimitCardProps {
-  /** Today's daily spending limit (₹) */
+  /** Today's daily spending limit (₹) — includes yesterday's carryover */
   dailyLimit: number;
-  /** Weekly budget rollup (₹) */
+  /** Weekly budget projection (₹) */
   weeklyBudget: number;
+  /** Total expenses in the rolling 7-day window (₹) */
+  weeklySpent: number;
   /** Burn rate status classification */
   burnStatus: BurnStatus;
   /** How much of today's daily limit is still unspent (₹) */
@@ -77,6 +79,7 @@ function futureDateLabel(today: Date, daysFromNow: number): string {
 export function DailyLimitCard({
   dailyLimit,
   weeklyBudget,
+  weeklySpent,
   burnStatus,
   todayRemaining,
   daysUntilBroke,
@@ -146,6 +149,10 @@ export function DailyLimitCard({
         className="font-body text-xs mt-1"
         style={{ color: 'var(--text-secondary)' }}
       >
+        <span className="font-mono" style={{ color: weeklySpent > weeklyBudget ? 'var(--color-expense)' : 'var(--text-primary)' }}>
+          ₹{formatINR(weeklySpent)}
+        </span>
+        <span>{' / '}</span>
         <span className="font-mono">₹{formatINR(weeklyBudget)}</span>
         {' / week'}
       </p>

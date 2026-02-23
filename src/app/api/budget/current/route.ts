@@ -46,12 +46,21 @@ export async function GET() {
     const budgetStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+    // ── Yesterday + rolling 7-day window ────────────────────
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 6); // 7 days inclusive of today
+    const weekStartStr = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+
     // ── Income entries from budget start ─────────────────────
     // Only budget-relevant types: allowance, festival_bonus
     // pass_through and emergency_fund are excluded.
     const { data: incomeRows, error: incomeError } = await supabase
       .from('income_entries')
-      .select('amount_encrypted, type, target_month')
+      .select('amount_encrypted, type, target_month, date')
       .eq('profile_id', profile.id)
       .gte('date', budgetStart)
       .in('type', ['allowance', 'festival_bonus'] satisfies IncomeType[]);
@@ -61,14 +70,17 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch income data' }, { status: 500 });
     }
 
-    // ── Find latest target_month from income entries ─────────
-    // e.g. if we have entries with target_month "2026-02" and "2026-03",
-    // the horizon stretches to end of March.
+    // ── Find latest target_month + earliest income date ──────
     let latestTargetMonth: string | null = null;
+    let earliestIncomeDate: string | null = null;
     for (const row of incomeRows ?? []) {
       const tm = row.target_month as string | null;
       if (tm && (!latestTargetMonth || tm > latestTargetMonth)) {
         latestTargetMonth = tm;
+      }
+      const d = row.date as string | null;
+      if (d && (!earliestIncomeDate || d < earliestIncomeDate)) {
+        earliestIncomeDate = d;
       }
     }
 
@@ -98,9 +110,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch expense data' }, { status: 500 });
     }
 
-    // ── Split today's expenses from total ────────────────────
+    // ── Split today's / yesterday's / week's expenses ────────
     const allExpenses = expenseRows ?? [];
     const todayExpenses = allExpenses.filter((row) => row.date === todayStr);
+    const yesterdayExpenses = allExpenses.filter((row) => row.date === yesterdayStr);
+    const weekExpenses = allExpenses.filter(
+      (row) => row.date >= weekStartStr && row.date <= todayStr,
+    );
 
     // ── Expected unpaid subscriptions before horizon ─────────
     // Active subscriptions with next_billing_date between today and horizon
@@ -138,7 +154,14 @@ export async function GET() {
       today_expenses: todayExpenses.map((row) => ({
         amount: row.amount_encrypted as string,
       })),
+      yesterday_expenses: yesterdayExpenses.map((row) => ({
+        amount: row.amount_encrypted as string,
+      })),
+      week_expenses: weekExpenses.map((row) => ({
+        amount: row.amount_encrypted as string,
+      })),
       latest_target_month: latestTargetMonth,
+      budget_start_date: earliestIncomeDate,
       expected_subscriptions: unpaidSubs.map((sub) => ({
         amount: sub.amount_encrypted as string,
         name: sub.name as string,

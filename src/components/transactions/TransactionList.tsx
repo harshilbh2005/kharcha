@@ -43,9 +43,10 @@ function groupByDate(
 function formatDateLabel(dateStr: string): string {
   try {
     const date = parseISO(dateStr);
-    if (isToday(date))     return "Today";
-    if (isYesterday(date)) return "Yesterday";
-    return format(date, "MMM d"); // "Feb 20"
+    const absolute = format(date, "MMM d"); // "Feb 20"
+    if (isToday(date))     return `Today · ${absolute}`;
+    if (isYesterday(date)) return `Yesterday · ${absolute}`;
+    return absolute;
   } catch {
     return dateStr;
   }
