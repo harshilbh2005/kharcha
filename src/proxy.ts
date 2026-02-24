@@ -30,7 +30,11 @@ const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
 const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)']);
 
 /** Tasker webhook — bypasses auth entirely */
-const isWebhookRoute = createRouteMatcher(['/api/webhook/tasker(.*)']);
+const isWebhookRoute = createRouteMatcher([
+  '/api/webhook/tasker(.*)',
+  /** Internal push dispatcher — protected by x-push-secret header, not Clerk */
+  '/api/push/send(.*)',
+]);
 
 // ── Proxy ────────────────────────────────────────────────────
 

@@ -22,6 +22,7 @@ import { parseSMSWithAI } from '@/lib/ai/parse-sms';
 import { checkAnomaly }   from '@/lib/algorithms/anomaly-detector';
 import { checkRateLimit as checkRL, getClientIP, RATE_LIMIT_WEBHOOK } from '@/lib/rate-limiter';
 import { sanitizeSMS } from '@/lib/sanitize';
+import { dispatchPush } from '@/lib/push-dispatch';
 import type { NotificationCreate } from '@/types';
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -149,6 +150,15 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
+
+    // Fire push notification (non-blocking)
+    void dispatchPush({
+      profileId,
+      title,
+      body:  message,
+      url:   '/transactions/new',
+      type:  'tasker_sms',
+    });
 
     return NextResponse.json({
       success:  true,

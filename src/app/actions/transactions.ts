@@ -16,6 +16,7 @@ import type { CreateTransactionInput } from '@/lib/validations';
 import type { Transaction, SubscriptionMatchResult, NotificationCreate } from '@/types';
 import { checkAnomaly, anomaliesToNotifications } from '@/lib/algorithms/anomaly-detector';
 import { sanitizeText } from '@/lib/sanitize';
+import { dispatchPush } from '@/lib/push-dispatch';
 
 // ============================================================
 // CONSTANTS
@@ -188,6 +189,17 @@ export async function createTransaction(
 
       if (error) {
         console.warn('[createTransaction] Failed to insert anomaly notifications:', error.message);
+      }
+
+      // Dispatch push for first anomaly notification (non-blocking)
+      if (!error && rows.length > 0) {
+        void dispatchPush({
+          profileId,
+          title: rows[0].title,
+          body:  rows[0].message,
+          url:   rows[0].action_url ?? '/transactions',
+          type:  'anomaly_detected',
+        });
       }
     }).catch((err: unknown) => {
       // Non-critical — never block the response

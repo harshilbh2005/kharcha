@@ -47,6 +47,7 @@ import {
   X,
 } from "lucide-react";
 import Toggle from "@/components/ui/Toggle";
+import { PushNotificationToggle } from "@/components/settings/PushNotificationToggle";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
@@ -944,13 +945,8 @@ export function SettingsClient({ profile, appSettings, categories }: SettingsCli
         <SettingRow
           divider={false}
           label="Push notifications"
-          description="Master toggle for all alerts"
-          right={
-            <Toggle
-              enabled={prof.notification_enabled}
-              onToggle={(v) => updateProf("notification_enabled", v)}
-            />
-          }
+          description="Receive alerts on your device"
+          right={<PushNotificationToggle />}
         />
         <SettingRow
           label="Subscription reminders"

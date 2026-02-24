@@ -190,3 +190,78 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// ── Web Push ──────────────────────────────────────────────────────────────────
+//
+// ServiceWorkerGlobalScope is augmented by Serwist (adds __SW_MANIFEST).
+// We need the real browser SW type for push/notificationclick events.
+// Cast via `swSelf` to get the standard SW global without TypeScript conflicts.
+
+interface PushPayload {
+  title: string;
+  body:  string;
+  url:   string;
+  type:  string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const swSelf = self as any as (Window & typeof globalThis);
+
+// Fired when the server delivers a push message to this SW
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+swSelf.addEventListener("push", (event: any) => {
+  if (!event.data) return;
+
+  let data: PushPayload;
+  try {
+    data = event.data.json() as PushPayload;
+  } catch {
+    data = {
+      title: "Kharcha",
+      body:  event.data.text() as string,
+      url:   "/",
+      type:  "general",
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+  event.waitUntil(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    (self as unknown as { registration: ServiceWorkerRegistration }).registration.showNotification(data.title, {
+      body:     data.body,
+      icon:     "/icons/icon-192.png",
+      badge:    "/icons/icon-192.png",
+      data:     { url: data.url },
+      tag:      data.type,
+      renotify: true,
+    } as NotificationOptions),
+  );
+});
+
+// Fired when the user taps a notification
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+swSelf.addEventListener("notificationclick", (event: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+  event.notification.close();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const url: string = (event.notification.data as { url?: string })?.url ?? "/";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const swClients = (self as unknown as { clients: any }).clients as {
+    matchAll: (opts: Record<string, unknown>) => Promise<{ focus: () => Promise<void>; navigate: (u: string) => Promise<void> }[]>;
+    openWindow: (url: string) => Promise<void>;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+  event.waitUntil(
+    swClients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          void client.focus();
+          void client.navigate(url);
+          return;
+        }
+      }
+      void swClients.openWindow(url);
+    }),
+  );
+});
