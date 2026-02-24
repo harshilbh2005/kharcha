@@ -61,8 +61,8 @@ For detailed specs (DB schema, animations, algorithms, page layouts):
 READ: ./MASTER_PROJECT_DOCUMENT.md
 
 ## CURRENT STATUS
-Phase: Complete (all phases shipped)
-Last completed: Final Polish Pass
+Phase: Complete (all phases shipped + post-launch fixes)
+Last completed: Post-launch bug fixes & UX improvements (2026-02-24)
 
 ## PROGRESS LOG
 (Update this after completing each major task)
@@ -79,6 +79,22 @@ Last completed: Final Polish Pass
 - [x] Phase 10: PWA Setup (Serwist + Offline Queue) ✅ (2026-02-24)
 - [x] Settings Page + NotificationBell ✅ (2026-02-24)
 - [x] Final Polish Pass ✅ (2026-02-24)
+- [x] Post-launch fixes ✅ (2026-02-24)
+  - Web Push: fixed VAPID set at module level (moved inside handler)
+  - PWA: fixed sw.js not generated (next build --webpack); added ServiceWorkerRegistrar
+  - PushNotificationToggle: replaced navigator.serviceWorker.ready with getRegistration()
+  - BOB SMS regex: patterns 12/13 for Dr./Cr. format (confidence 0.95, no Claude API)
+  - SmartPasteInput: wired Phase 7 AI stub to real POST /api/ai/parse-sms
+  - FABMenu: FAB hides (scale 0) when any modal is active — no more overlap
+  - AddSubscriptionModal: added 20px padding to fullHeight content wrapper
+
+## KEY BUSINESS LOGIC
+- SMS parsing: 3-tier — regex (confidence ≥ 0.5) → Claude API → error
+  - BOB bank: "Rs.X Dr./Cr. from/to A/C XXXXXX1234" matches Pattern 12/13 at 0.95
+  - Phone-number UPI IDs (8511613428@axl) preserved as-is (cleanMerchant skip)
+  - BOB date format (YYYY:MM:DD HH:MM:SS) normalised to YYYY-MM-DD
+- SmartPasteInput flow: regex local → if confidence < 0.5 call /api/ai/parse-sms once
+  - Button disabled during parsing → no double-fire; server rate-limits at 20 req/min
 
 ## KNOWN GOTCHAS
 - Clerk + Supabase integration: Need JWT template named "supabase" in Clerk dashboard
@@ -89,3 +105,7 @@ Last completed: Final Polish Pass
 - PWA: manifest.json must be in /public, theme_color: #8B7355
 - Encryption: Key NEVER stored persistently — derived from PIN each session
 - pnpm: Use pnpm, NOT npm. If you see npm commands, convert to pnpm
+- Build: MUST use `next build --webpack` (not default Turbopack) — Serwist needs webpack plugin
+- Push notifications: webpush.setVapidDetails() must be INSIDE the route handler, not module top-level
+- fullHeight modals: padding:0 on shell — children must add their own horizontal padding (20px)
+- FABMenu: activeModal state drives FAB visibility — always set activeModal when opening modals via FAB
