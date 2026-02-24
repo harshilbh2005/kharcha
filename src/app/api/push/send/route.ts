@@ -15,14 +15,6 @@ import webpush from 'web-push';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/service';
 
-// ── VAPID configuration ────────────────────────────────────────────────────────
-
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
-
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const sendSchema = z.object({
@@ -38,6 +30,14 @@ const sendSchema = z.object({
 // ── POST /api/push/send ────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Configure VAPID inside the handler so env vars are available at runtime
+  // (not at build time — top-level setVapidDetails causes Vercel build failures)
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!,
+  );
+
   // Verify this is an internal server call
   const secret = req.headers.get('x-push-secret');
   if (!secret || secret !== process.env.PUSH_INTERNAL_SECRET) {

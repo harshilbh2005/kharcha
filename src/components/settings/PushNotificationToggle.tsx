@@ -49,7 +49,13 @@ export function PushNotificationToggle() {
         return;
       }
       try {
-        const reg = await navigator.serviceWorker.ready;
+        // Use getRegistration() instead of .ready — .ready hangs forever
+        // if no SW is registered yet (e.g. dev mode or first load).
+        const reg = await navigator.serviceWorker.getRegistration("/");
+        if (!reg?.pushManager) {
+          setStatus("disabled");
+          return;
+        }
         const existing = await reg.pushManager.getSubscription();
         setStatus(existing ? "enabled" : "disabled");
       } catch {
@@ -78,8 +84,20 @@ export function PushNotificationToggle() {
         return;
       }
 
-      // 2. Subscribe
-      const reg = await navigator.serviceWorker.ready;
+      // 2. Subscribe — wait up to 5s for SW, then fall back to getRegistration
+      let reg = await navigator.serviceWorker.getRegistration("/");
+      if (!reg) {
+        // SW not registered yet — wait for it (e.g. first load after install)
+        reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<ServiceWorkerRegistration | undefined>((resolve) =>
+            setTimeout(() => resolve(undefined), 5000)
+          ),
+        ]) as ServiceWorkerRegistration | undefined;
+      }
+      if (!reg?.pushManager) {
+        throw new Error("Service worker not available — please install the app first");
+      }
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -116,7 +134,8 @@ export function PushNotificationToggle() {
     setStatus("loading");
 
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.getRegistration("/");
+      if (!reg?.pushManager) { setStatus("disabled"); return; }
       const sub = await reg.pushManager.getSubscription();
 
       if (sub) {
