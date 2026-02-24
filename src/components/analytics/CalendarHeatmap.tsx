@@ -4,7 +4,8 @@
 // KHARCHA — CalendarHeatmap
 // Monthly calendar grid coloured by daily spending intensity.
 // Rows: weeks (Mon–Sun). Tap a day to see that day's total.
-// Animation: squares stagger in from top-left to bottom-right.
+// Animation: rows reveal sequentially (120ms stagger), cells
+// within each row appear together.
 // ============================================================
 
 import { useState, useMemo } from 'react';
@@ -52,16 +53,24 @@ function monFirst(jsDay: number) {
   return (jsDay + 6) % 7;
 }
 
-// ── Square variants ───────────────────────────────────────────────────────────
+// ── Row-level variants ────────────────────────────────────────────────────────
+//
+// Container staggers rows at 120ms each.
+// Each row slides up 8px + fades in over 300ms.
+// Cells within a row have no individual variants — they all appear together.
 
-const squareVariants = {
-  hidden: { opacity: 0, scale: 0.5 },
-  visible: { opacity: 1, scale: 1 },
+const rowContainerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12 } },
 };
 
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.012 } },
+const rowVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: 'easeOut' as const },
+  },
 };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -101,6 +110,12 @@ export function CalendarHeatmap({ data, monthYear }: CalendarHeatmapProps) {
   // Pad to complete the last row
   while (cells.length % 7 !== 0) cells.push(null);
 
+  // Group into rows of 7 for row-by-row animation
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    rows.push(cells.slice(i, i + 7));
+  }
+
   const today = new Date();
   const selectedAmount = selectedDate ? (dayMap.get(selectedDate) ?? 0) : null;
 
@@ -109,8 +124,7 @@ export function CalendarHeatmap({ data, monthYear }: CalendarHeatmapProps) {
       {/* ── Day-of-week header ─────────────────────────────── */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
+          display: 'flex',
           gap: 4,
           marginBottom: 4,
         }}
@@ -120,6 +134,7 @@ export function CalendarHeatmap({ data, monthYear }: CalendarHeatmapProps) {
             key={i}
             className="font-body"
             style={{
+              flex: 1,
               fontSize: 11,
               color: 'var(--text-secondary)',
               textAlign: 'center',
@@ -131,67 +146,79 @@ export function CalendarHeatmap({ data, monthYear }: CalendarHeatmapProps) {
         ))}
       </div>
 
-      {/* ── Calendar grid ─────────────────────────────────── */}
+      {/* ── Calendar grid — row-by-row reveal ──────────────── */}
+      {/*
+        key={monthYear}: changing month resets the animation so rows re-stagger in.
+      */}
       <motion.div
-        variants={containerVariants}
+        key={monthYear}
+        variants={rowContainerVariants}
         initial="hidden"
         animate="visible"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: 4,
-        }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
       >
-        {cells.map((day, i) => {
-          if (day === null) {
-            return <div key={`pad-${i}`} style={{ aspectRatio: '1' }} />;
-          }
+        {rows.map((row, rowIndex) => (
+          <motion.div
+            key={rowIndex}
+            variants={rowVariants}
+            style={{ display: 'flex', gap: 4 }}
+          >
+            {row.map((day, colIndex) => {
+              if (day === null) {
+                return (
+                  <div
+                    key={`pad-${rowIndex}-${colIndex}`}
+                    style={{ flex: 1, aspectRatio: '1' }}
+                  />
+                );
+              }
 
-          const dateStr = `${monthYear}-${String(day).padStart(2, '0')}`;
-          const amount = dayMap.get(dateStr) ?? 0;
-          const isToday = isSameDay(parseISO(dateStr), today);
-          const isSelected = selectedDate === dateStr;
-          const bg = heatColor(amount, maxAmount);
+              const dateStr = `${monthYear}-${String(day).padStart(2, '0')}`;
+              const amount = dayMap.get(dateStr) ?? 0;
+              const isToday = isSameDay(parseISO(dateStr), today);
+              const isSelected = selectedDate === dateStr;
+              const bg = heatColor(amount, maxAmount);
 
-          return (
-            <motion.button
-              key={dateStr}
-              variants={squareVariants}
-              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-              onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-              style={{
-                aspectRatio: '1',
-                borderRadius: 6,
-                background: bg,
-                border: isSelected
-                  ? '2px solid var(--color-accent)'
-                  : isToday
-                  ? '1.5px solid var(--color-expense)'
-                  : '1px solid var(--border-default)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                minHeight: 36,
-                position: 'relative',
-              }}
-              whileTap={{ scale: 0.88 }}
-              aria-label={`${dateStr}: ${amount > 0 ? formatINR(amount) : 'no spending'}`}
-            >
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  color: amount > 0 ? '#FFFFFF' : 'var(--text-secondary)',
-                  fontWeight: amount > 0 ? 600 : 400,
-                  lineHeight: 1,
-                }}
-              >
-                {day}
-              </span>
-            </motion.button>
-          );
-        })}
+              return (
+                <motion.button
+                  key={dateStr}
+                  onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                  style={{
+                    flex: 1,
+                    aspectRatio: '1',
+                    borderRadius: 6,
+                    background: bg,
+                    border: isSelected
+                      ? '2px solid var(--color-accent)'
+                      : isToday
+                      ? '1.5px solid var(--color-expense)'
+                      : '1px solid var(--border-default)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    minHeight: 36,
+                    position: 'relative',
+                  }}
+                  whileTap={{ scale: 0.88 }}
+                  aria-label={`${dateStr}: ${amount > 0 ? formatINR(amount) : 'no spending'}`}
+                >
+                  <span
+                    className="font-mono"
+                    style={{
+                      fontSize: 10,
+                      color: amount > 0 ? '#FFFFFF' : 'var(--text-secondary)',
+                      fontWeight: amount > 0 ? 600 : 400,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {day}
+                  </span>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        ))}
       </motion.div>
 
       {/* ── Selected day detail ────────────────────────────── */}

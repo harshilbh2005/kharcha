@@ -342,13 +342,28 @@ export function AISummary({
             transition={{ type: 'spring', stiffness: 200, damping: 26 }}
             style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
-            {/* Summary paragraph */}
-            <p
+            {/* Summary paragraph — word-by-word type-in (30ms per word) */}
+            <motion.p
               className="font-body"
               style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.6, margin: 0 }}
+              variants={{
+                visible: { transition: { staggerChildren: 0.03, delayChildren: 0.15 } },
+              }}
+              initial="hidden"
+              animate="visible"
             >
-              {result.summary}
-            </p>
+              {result.summary.split(' ').map((word, i, arr) => (
+                <motion.span
+                  key={i}
+                  variants={{
+                    hidden: { opacity: 0, y: 4 },
+                    visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: 'easeOut' } },
+                  }}
+                >
+                  {word}{i < arr.length - 1 ? ' ' : ''}
+                </motion.span>
+              ))}
+            </motion.p>
 
             <div
               style={{

@@ -49,6 +49,13 @@ const BURN_INDICATORS: Record<BurnStatus, BurnIndicator> = {
   },
 };
 
+// Pulse duration varies by urgency: safe → slow, danger → fast
+const PULSE_DURATION: Record<BurnStatus, string> = {
+  safe:    '3s',
+  caution: '1.5s',
+  danger:  '0.8s',
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatINR(amount: number): string {
@@ -86,8 +93,9 @@ export function DailyLimitCard({
   today = new Date(),
   delay = 0,
 }: DailyLimitCardProps) {
-  const indicator = BURN_INDICATORS[burnStatus];
-  const brokeDate = daysUntilBroke !== null
+  const indicator    = BURN_INDICATORS[burnStatus];
+  const pulseDuration = PULSE_DURATION[burnStatus];
+  const brokeDate    = daysUntilBroke !== null
     ? futureDateLabel(today, daysUntilBroke)
     : null;
 
@@ -108,7 +116,16 @@ export function DailyLimitCard({
 
       {/* ── Burn rate indicator ────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 mt-2">
-        <motion.span
+        {/*
+          Two-layer dot:
+          • Outer motion.div — Framer Motion spring entrance (scale 0→1).
+            Framer owns `transform` on this element, so CSS can't safely
+            animate it here.
+          • Inner span — CSS dot-pulse animation (opacity + scale), free
+            of any Framer Motion transforms.
+          Pulse starts after the entrance spring finishes (~delay + 0.9 s).
+        */}
+        <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{
@@ -117,14 +134,19 @@ export function DailyLimitCard({
             damping: 20,
             delay: delay + 0.4,
           }}
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: indicator.color,
-            flexShrink: 0,
-          }}
-        />
+          style={{ width: 8, height: 8, flexShrink: 0 }}
+        >
+          <span
+            style={{
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: indicator.color,
+              animation: `dot-pulse ${pulseDuration} ease-in-out ${delay + 0.9}s infinite`,
+            }}
+          />
+        </motion.div>
         <span
           className="font-body text-xs font-medium"
           style={{ color: indicator.color }}

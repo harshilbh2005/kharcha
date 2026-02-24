@@ -40,6 +40,27 @@ function formatRelativeDate(dateStr: string): string {
   return format(date, 'd MMM');
 }
 
+function formatTime(time: string | null): string {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  const h = hours % 12 || 12;
+  const m = String(minutes).padStart(2, '0');
+  return `${h}:${m} ${hours < 12 ? 'am' : 'pm'}`;
+}
+
+function formatCreatedAtTime(createdAt: string): string {
+  try {
+    const d = new Date(createdAt);
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const h = hours % 12 || 12;
+    const m = String(minutes).padStart(2, '0');
+    return `${h}:${m} ${hours < 12 ? 'am' : 'pm'}`;
+  } catch {
+    return '';
+  }
+}
+
 // ─── Compact transaction row variants ─────────────────────────────────────────
 
 const rowVariants = {
@@ -73,7 +94,10 @@ export function RecentTransactions({
   delay = 0,
 }: RecentTransactionsProps) {
   const router = useRouter();
-  const items = transactions.slice(0, 5);
+  // Show up to 10 entries sorted latest-first; parent already passes newest-first
+  const items = [...transactions].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at),
+  ).slice(0, 10);
 
   return (
     <Card animated delay={delay} className="!px-0">
@@ -87,7 +111,7 @@ export function RecentTransactions({
         </p>
       </div>
 
-      {/* ── Transaction rows ───────────────────────────────────────────────── */}
+      {/* ── Transaction rows (scrollable, max ~5 rows visible) ─────────────── */}
       {items.length === 0 ? (
         <div className="px-5 py-6 text-center">
           <p
@@ -98,18 +122,26 @@ export function RecentTransactions({
           </p>
         </div>
       ) : (
-        <AnimatePresence mode="popLayout">
-          {items.map((txn, index) => (
-            <CompactTransactionRow
-              key={txn.id}
-              transaction={txn}
-              isLast={index === items.length - 1}
-              onPress={() => onTransactionPress?.(txn)}
-              index={index}
-              parentDelay={delay}
-            />
-          ))}
-        </AnimatePresence>
+        <div
+          style={{
+            maxHeight: 300,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <AnimatePresence mode="popLayout">
+            {items.map((txn, index) => (
+              <CompactTransactionRow
+                key={txn.id}
+                transaction={txn}
+                isLast={index === items.length - 1}
+                onPress={() => onTransactionPress?.(txn)}
+                index={index}
+                parentDelay={delay}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
       )}
 
       {/* ── View All footer ────────────────────────────────────────────────── */}
@@ -158,6 +190,12 @@ function CompactTransactionRow({
   const amountStr = `${sign}₹${formatAmount(transaction.amount)}`;
   const label = transaction.merchant || transaction.description;
 
+  const timeStr = transaction.time
+    ? formatTime(transaction.time)
+    : formatCreatedAtTime(transaction.created_at);
+  const dateStr = formatRelativeDate(transaction.date);
+  const dateTimeStr = timeStr ? `${dateStr} · ${timeStr}` : dateStr;
+
   return (
     <motion.div
       variants={rowVariants}
@@ -167,8 +205,8 @@ function CompactTransactionRow({
       onClick={onPress}
       className="flex items-center gap-2.5 cursor-pointer select-none"
       style={{
-        paddingTop: 8,
-        paddingBottom: 8,
+        paddingTop: 10,
+        paddingBottom: 10,
         paddingLeft: 20,
         paddingRight: 20,
         borderBottom: isLast ? 'none' : '1px solid var(--border-default)',
@@ -204,7 +242,7 @@ function CompactTransactionRow({
         )}
       </div>
 
-      {/* Amount + date */}
+      {/* Amount + date·time */}
       <div className="flex-none flex flex-col items-end gap-0.5">
         <span
           className="font-mono text-xs font-medium tabular-nums"
@@ -213,10 +251,10 @@ function CompactTransactionRow({
           {amountStr}
         </span>
         <span
-          className="text-[10px] tabular-nums"
-          style={{ color: 'var(--text-tertiary)' }}
+          className="font-mono tabular-nums"
+          style={{ fontSize: '0.625rem', color: 'var(--text-secondary)' }}
         >
-          {formatRelativeDate(transaction.date)}
+          {dateTimeStr}
         </span>
       </div>
     </motion.div>

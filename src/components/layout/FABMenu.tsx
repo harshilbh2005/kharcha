@@ -9,17 +9,19 @@
 //   Subscription (bottom-right)
 //   Smart Paste  (top, above arc)
 //
-// Icons are the same Lucide icons used elsewhere in the project:
-//   ArrowDownLeft (expense), Wallet (income),
-//   RefreshCw (subscription), Sparkles (smart paste)
-//
-// Buttons use --bg-surface (parchment) as solid background —
-// same as all cards in the app — so icons are always crisp.
-// Coloured border + shadow give each button its semantic identity.
+// Polish features:
+//   • Resting shadow pulses in sync with the float animation
+//   • FAB scales 1→1.1→1 (pulse) when menu opens
+//   • Overlay fades in with blur(4px)
+//   • Fan buttons spring in with stiffness:500/damping:22, 60ms stagger
+//   • Labels slide in 150ms after their button (x:5→0, opacity 0→1)
+//   • Close WITHOUT selection: buttons spring out with 40ms stagger
+//   • Close WITH selection: selected button scales 1→1.3→0, others collapse
+//   • Haptic: FAB tap 30ms, mini button tap 20ms
 // ============================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Plus,
   ArrowDownLeft,
@@ -42,29 +44,25 @@ type ActiveModal = 'none' | 'expense' | 'income' | 'subscription' | 'smartpaste'
 interface FanButtonDef {
   id:          ActiveModal;
   label:       string;
-  // Lucide icon component
   Icon:        React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
-  // Design-token colours (CSS variable strings)
   iconColor:   string;
-  borderColor: string;   // semantic colour border
-  shadowColor: string;   // coloured drop-shadow
+  borderColor: string;
+  shadowColor: string;
   /** X offset from FAB center (px) */
   x: number;
   /** Y offset from FAB center (px, negative = up) */
   y: number;
-  /** Circle diameter (px) — Expense is slightly larger */
+  /** Circle diameter (px) */
   size: number;
   iconSize: number;
 }
 
-// All buttons share --bg-surface (parchment #F2F0ED) — same as cards throughout the app.
-// Coloured border + shadow distinguish each action type semantically.
 const FAN_BUTTONS: FanButtonDef[] = [
   {
     id:          'expense',
     label:       'Expense',
     Icon:        ArrowDownLeft,
-    iconColor:   'var(--color-expense)',   // terracotta #A37B6F
+    iconColor:   'var(--color-expense)',
     borderColor: 'rgba(163,123,111,0.55)',
     shadowColor: 'rgba(163,123,111,0.30)',
     x: -68, y: -82, size: 54, iconSize: 22,
@@ -73,7 +71,7 @@ const FAN_BUTTONS: FanButtonDef[] = [
     id:          'income',
     label:       'Income',
     Icon:        Wallet,
-    iconColor:   'var(--color-income)',    // sage #6B7D71
+    iconColor:   'var(--color-income)',
     borderColor: 'rgba(107,125,113,0.55)',
     shadowColor: 'rgba(107,125,113,0.28)',
     x: 0, y: -110, size: 48, iconSize: 19,
@@ -82,7 +80,7 @@ const FAN_BUTTONS: FanButtonDef[] = [
     id:          'subscription',
     label:       'Subscription',
     Icon:        RefreshCw,
-    iconColor:   'var(--color-accent)',    // bronze #8B7355
+    iconColor:   'var(--color-accent)',
     borderColor: 'rgba(139,115,85,0.55)',
     shadowColor: 'rgba(139,115,85,0.26)',
     x: 68, y: -82, size: 48, iconSize: 19,
@@ -91,32 +89,61 @@ const FAN_BUTTONS: FanButtonDef[] = [
     id:          'smartpaste',
     label:       'Smart Paste',
     Icon:        Sparkles,
-    iconColor:   'var(--color-vault)',     // deep forest #5C6B5E
+    iconColor:   'var(--color-vault)',
     borderColor: 'rgba(92,107,94,0.55)',
     shadowColor: 'rgba(92,107,94,0.26)',
     x: 0, y: -178, size: 44, iconSize: 17,
   },
 ];
 
-// Spring preset for all fan button animations
-const FAN_SPRING = { type: 'spring', stiffness: 380, damping: 22 } as const;
-
 // ── FanItem ───────────────────────────────────────────────────────────────────
 //
-// A single coloured action button + label.
-// It is anchored at fabCenter (fixed left/top) and Framer Motion
-// translates it to its arc position via x/y so the origin of the
-// animation always appears to come from the FAB itself.
+// Animated fan button + label.
+// Uses variants so enter/exit can carry their own transition configs.
+// The label is a separate motion.span so it appears 150ms after the button.
 
 interface FanItemProps {
-  btn:       FanButtonDef;
-  index:     number;
-  fabCenter: { x: number; y: number };
-  onPress:   (id: ActiveModal) => void;
+  btn:        FanButtonDef;
+  index:      number;
+  fabCenter:  { x: number; y: number };
+  onPress:    (id: ActiveModal) => void;
+  /** The button that was tapped to close the menu (null = plain dismiss) */
+  selectedId: ActiveModal | null;
 }
 
-function FanItem({ btn, index, fabCenter, onPress }: FanItemProps) {
+function FanItem({ btn, index, fabCenter, onPress, selectedId }: FanItemProps) {
   const { Icon } = btn;
+  const isSelected = selectedId === btn.id;
+  const enterDelay = index * 0.06;   // 60ms stagger on open
+  const exitDelay  = index * 0.04;   // 40ms stagger on close (faster)
+
+  // Variants — defined here so btn.x / btn.y are in scope
+  const containerVariants: Variants = {
+    hidden: { scale: 0, opacity: 0, x: 0, y: 0 },
+    visible: {
+      scale: 1,
+      opacity: 1,
+      x: btn.x,
+      y: btn.y,
+      transition: { type: 'spring', stiffness: 500, damping: 22, delay: enterDelay },
+    },
+    // Plain dismiss: spring to FAB center, staggered
+    exitNormal: {
+      scale: 0,
+      opacity: 0,
+      x: 0,
+      y: 0,
+      transition: { type: 'spring', stiffness: 400, damping: 30, delay: exitDelay },
+    },
+    // Selected: stays in place, scales up then collapses
+    exitSelected: {
+      scale: [1, 1.3, 0],
+      opacity: [1, 1, 0],
+      x: btn.x,
+      y: btn.y,
+      transition: { type: 'tween', duration: 0.35, times: [0, 0.4, 1] },
+    },
+  };
 
   return (
     <motion.div
@@ -132,10 +159,10 @@ function FanItem({ btn, index, fabCenter, onPress }: FanItemProps) {
         pointerEvents: 'auto',
         overflow:      'visible',
       }}
-      initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-      animate={{ scale: 1, opacity: 1, x: btn.x, y: btn.y }}
-      exit={{   scale: 0, opacity: 0, x: 0, y: 0 }}
-      transition={{ ...FAN_SPRING, delay: index * 0.05 }}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      exit={isSelected ? 'exitSelected' : 'exitNormal'}
     >
       {/* ── Circle button ─────────────────────────────────────────────────── */}
       <motion.button
@@ -148,10 +175,8 @@ function FanItem({ btn, index, fabCenter, onPress }: FanItemProps) {
           height:          btn.size,
           flexShrink:      0,
           borderRadius:    '50%',
-          // Solid parchment — same as all app cards, icons always crisp
           backgroundColor: 'var(--bg-surface)',
           border:          `1.5px solid ${btn.borderColor}`,
-          // Coloured drop shadow gives each button its semantic identity
           boxShadow:       `0 4px 18px ${btn.shadowColor}, 0 2px 6px rgba(0,0,0,0.10)`,
           cursor:          'pointer',
           display:         'flex',
@@ -163,23 +188,31 @@ function FanItem({ btn, index, fabCenter, onPress }: FanItemProps) {
         <Icon size={btn.iconSize} strokeWidth={1.8} color={btn.iconColor} />
       </motion.button>
 
-      {/* ── Label ─────────────────────────────────────────────────────────── */}
-      <span
+      {/* ── Label — appears 150ms after button ────────────────────────────── */}
+      <motion.span
+        initial={{ opacity: 0, x: 5 }}
+        animate={{
+          opacity: 1,
+          x: 0,
+          transition: { delay: enterDelay + 0.15, duration: 0.2, ease: 'easeOut' },
+        }}
+        exit={{ opacity: 0, x: 5 }}
+        transition={{ duration: 0.1 }}
         style={{
-          marginTop:  7,
-          fontSize:   '0.67rem',
-          fontFamily: 'var(--font-body)',
-          fontWeight: 600,
-          color:      '#ffffff',
-          whiteSpace: 'nowrap',
+          marginTop:     7,
+          fontSize:      '0.67rem',
+          fontFamily:    'var(--font-body)',
+          fontWeight:    600,
+          color:         '#ffffff',
+          whiteSpace:    'nowrap',
           pointerEvents: 'none',
-          // White + shadow — readable over the dark overlay
-          textShadow: '0 1px 4px rgba(0,0,0,0.65)',
+          textShadow:    '0 1px 4px rgba(0,0,0,0.65)',
           letterSpacing: '0.02em',
+          display:       'block',
         }}
       >
         {btn.label}
-      </span>
+      </motion.span>
     </motion.div>
   );
 }
@@ -187,9 +220,11 @@ function FanItem({ btn, index, fabCenter, onPress }: FanItemProps) {
 // ── FABMenu ───────────────────────────────────────────────────────────────────
 
 export function FABMenu() {
-  const [isFanOpen,   setIsFanOpen]   = useState(false);
-  const [activeModal, setActiveModal] = useState<ActiveModal>('none');
-  const [fabCenter,   setFabCenter]   = useState({ x: 0, y: 0 });
+  const [isFanOpen,    setIsFanOpen]    = useState(false);
+  const [activeModal,  setActiveModal]  = useState<ActiveModal>('none');
+  const [fabCenter,    setFabCenter]    = useState({ x: 0, y: 0 });
+  // Tracks which mini button triggered close — drives exit emphasis
+  const [selectedId,   setSelectedId]   = useState<ActiveModal | null>(null);
   const [exchangeRate, setExchangeRate] = useState(84);
   const [smartPastePrefill, setSmartPastePrefill] =
     useState<AddExpenseModalPrefill | undefined>();
@@ -207,7 +242,10 @@ export function FABMenu() {
   }, []);
 
   // ── FAB press ─────────────────────────────────────────────────────────────
-  const handleFabPress = () => {
+  const handleFabPress = useCallback(() => {
+    // Short haptic buzz on FAB tap
+    if (navigator.vibrate) navigator.vibrate(30);
+
     if (isFanOpen) {
       setIsFanOpen(false);
     } else {
@@ -219,12 +257,20 @@ export function FABMenu() {
       );
       setIsFanOpen(true);
     }
-  };
+  }, [isFanOpen]);
 
-  // ── Fan button press: close fan → 200 ms → open modal ────────────────────
+  // ── Fan button press ───────────────────────────────────────────────────────
+  // 1. Lighter haptic
+  // 2. Record which button was chosen (drives exitSelected variant)
+  // 3. Close the fan (triggers exit animations)
+  // 4. Open the corresponding modal 200 ms later (lets exit settle)
+  // 5. Clear selectedId at 700 ms (well after exit animations finish)
   const handleFanButtonPress = useCallback((id: ActiveModal) => {
+    if (navigator.vibrate) navigator.vibrate(20);
+    setSelectedId(id);
     setIsFanOpen(false);
     setTimeout(() => setActiveModal(id), 200);
+    setTimeout(() => setSelectedId(null), 700);
   }, []);
 
   // ── Modal close ───────────────────────────────────────────────────────────
@@ -249,17 +295,51 @@ export function FABMenu() {
   return (
     <>
       {/* ── FAB button ────────────────────────────────────────────────────── */}
+      {/*
+        Resting: floats y:[0,-2,0] with shadow growing when up and shrinking when down.
+        Opening: pulses scale 1→1.1→1 (0.2 s) as the fan launches.
+        Shadow is animated in `animate` (not `style`) so it can loop with the float.
+      */}
       <motion.button
         ref={fabRef}
         type="button"
         onClick={handleFabPress}
         aria-label={isFanOpen ? 'Close menu' : 'Add transaction'}
         aria-expanded={isFanOpen}
-        animate={isFanOpen ? { y: 0 } : { y: [0, -2, 0] }}
+        initial={{
+          boxShadow: '0 4px 12px rgba(42,45,52,0.08), 0 1px 4px rgba(0,0,0,0.06)',
+        }}
+        animate={
+          isFanOpen
+            ? {
+                y: 0,
+                // Pulse once on open
+                scale: [1, 1.1, 1],
+                boxShadow: '0 8px 24px rgba(42,45,52,0.20), 0 2px 8px rgba(0,0,0,0.12)',
+              }
+            : {
+                y: [0, -2, 0],
+                scale: 1,
+                // Shadow grows as button lifts, shrinks as it returns
+                boxShadow: [
+                  '0 4px 12px rgba(42,45,52,0.08), 0 1px 4px rgba(0,0,0,0.06)',
+                  '0 8px 20px rgba(42,45,52,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+                  '0 4px 12px rgba(42,45,52,0.08), 0 1px 4px rgba(0,0,0,0.06)',
+                ],
+              }
+        }
         transition={
           isFanOpen
-            ? { duration: 0.15 }
-            : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+            ? {
+                scale:     { duration: 0.2, ease: 'easeInOut' },
+                y:         { duration: 0.15 },
+                boxShadow: { duration: 0.2 },
+              }
+            : {
+                y:         { duration: 3, repeat: Infinity, ease: 'easeInOut' },
+                scale:     { duration: 0.15 },
+                boxShadow: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
+              }
         }
         whileTap={{ scale: 0.90 }}
         style={{
@@ -277,10 +357,10 @@ export function FABMenu() {
           display:         'flex',
           alignItems:      'center',
           justifyContent:  'center',
-          boxShadow:       'var(--shadow-float, 0 4px 20px rgba(139,115,85,0.35), 0 1px 6px rgba(0,0,0,0.12))',
           transition:      'background-color 0.2s ease',
         }}
       >
+        {/* "+" rotates to "×" when fan opens */}
         <motion.div
           animate={{ rotate: isFanOpen ? 45 : 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
@@ -294,7 +374,7 @@ export function FABMenu() {
       <AnimatePresence>
         {isFanOpen && (
           <>
-            {/* Overlay */}
+            {/* Backdrop — fades in with blur(4px) */}
             <motion.div
               key="fab-overlay"
               initial={{ opacity: 0 }}
@@ -304,11 +384,12 @@ export function FABMenu() {
               onClick={() => setIsFanOpen(false)}
               aria-hidden="true"
               style={{
-                position:        'fixed',
-                inset:           0,
-                zIndex:          50,
-                backgroundColor: 'rgba(30, 32, 36, 0.55)',
-                backdropFilter:  'blur(3px)',
+                position:             'fixed',
+                inset:                0,
+                zIndex:               50,
+                backgroundColor:      'rgba(30, 32, 36, 0.55)',
+                backdropFilter:       'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
               }}
             />
 
@@ -320,6 +401,7 @@ export function FABMenu() {
                 index={i}
                 fabCenter={fabCenter}
                 onPress={handleFanButtonPress}
+                selectedId={selectedId}
               />
             ))}
           </>

@@ -19,11 +19,15 @@
 // Layout: mobile single-column with StaggerContainer entrance.
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Bell } from 'lucide-react';
+import { PenTool, Settings } from 'lucide-react';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 
 import Header from '@/components/layout/Header';
+import { NotificationBell } from '@/components/shared/NotificationBell';
 import { StaggerContainer } from '@/components/animations/StaggerContainer';
 import Skeleton from '@/components/ui/Skeleton';
 import { BalanceCard } from '@/components/dashboard/BalanceCard';
@@ -38,6 +42,12 @@ import { useUpcomingSubscriptions } from '@/hooks/useSubscriptions';
 import { useEncryption } from '@/hooks/useEncryption';
 import type { Transaction, TransactionDecrypted } from '@/types';
 
+// ─── Pull-to-refresh config ───────────────────────────────────────────────────
+
+const PTR_THRESHOLD = 60;   // px of resistance needed to fire refresh
+const PTR_MAX_DRAG  = 90;   // max visual pull (rubber-band cap)
+const PTR_NIB_SIZE  = 22;   // px — PenTool icon size
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -48,6 +58,53 @@ export default function DashboardPage() {
   const { data: vault, isLoading: vaultLoading } = useVault();
   const { data: upcomingSubs } = useUpcomingSubscriptions();
   const { decryptMany, isUnlocked } = useEncryption();
+  const queryClient = useQueryClient();
+
+  // ── Pull-to-refresh state ────────────────────────────────────────────────────
+
+  const [ptrRefreshing, setPtrRefreshing] = useState(false);
+  const pullY      = useMotionValue(0);
+  // PenTool nib stretches vertically as user pulls
+  const nibScaleY  = useTransform(pullY, [0, PTR_MAX_DRAG], [1, 1.7]);
+  // Nib fades in once pull starts, fully visible at threshold
+  const nibOpacity = useTransform(pullY, [0, PTR_THRESHOLD * 0.3, PTR_THRESHOLD], [0, 0.4, 1]);
+
+  const touchStartY = useRef<number | null>(null);
+  const pulling     = useRef(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only engage PTR when scrolled to very top of page
+    if (window.scrollY > 5) return;
+    touchStartY.current = e.touches[0].clientY;
+    pulling.current = true;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pulling.current || touchStartY.current === null) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta <= 0) { pullY.set(0); return; }
+    // Rubber-band resistance: 0.45× raw drag, capped at PTR_MAX_DRAG
+    pullY.set(Math.min(delta * 0.45, PTR_MAX_DRAG));
+  }, [pullY]);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (!pulling.current) return;
+    pulling.current  = false;
+    touchStartY.current = null;
+
+    const current = pullY.get();
+    // Spring snap-back
+    animate(pullY, 0, { type: 'spring', stiffness: 400, damping: 30 });
+
+    if (current >= PTR_THRESHOLD && !ptrRefreshing) {
+      setPtrRefreshing(true);
+      try {
+        await queryClient.invalidateQueries();
+      } finally {
+        setPtrRefreshing(false);
+      }
+    }
+  }, [pullY, ptrRefreshing, queryClient]);
 
   // ── Decrypt recent transactions ─────────────────────────────────────────────
   // Transactions arrive encrypted from the server action.
@@ -111,32 +168,55 @@ export default function DashboardPage() {
       <Header
         title="Kharcha"
         rightElement={
-          <button
-            aria-label="Notifications"
-            className="flex items-center justify-center rounded-full"
-            style={{
-              width: 44,
-              height: 44,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <Bell size={20} strokeWidth={1.8} />
-          </button>
+          <>
+            <NotificationBell />
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                textDecoration: 'none',
+              }}
+            >
+              <Settings size={18} strokeWidth={1.8} />
+            </Link>
+          </>
         }
       />
 
-      {/* ── Main content ──────────────────────────────────────────────────── */}
+      {/* ── Main content — wraps pull-to-refresh touch zone ────────────────── */}
       <div
         className="px-4 pb-24"
         style={{ paddingTop: 'var(--space-4)' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
+        {/* Pull-to-refresh nib indicator */}
+        <motion.div
+          className="flex items-center justify-center"
+          style={{ height: pullY, overflow: 'hidden', pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          <motion.div style={{ scaleY: nibScaleY, opacity: nibOpacity }}>
+            <PenTool
+              size={PTR_NIB_SIZE}
+              strokeWidth={1.5}
+              style={{ color: 'var(--color-accent)' }}
+            />
+          </motion.div>
+        </motion.div>
+
         {isLoading ? (
           <DashboardSkeleton />
         ) : (
-          <StaggerContainer className="flex flex-col gap-4" staggerDelay={0.06}>
+          <StaggerContainer className="flex flex-col gap-4" staggerDelay={0.1}>
             {/* ── Balance Card (full width) ─────────────────────────────────── */}
             <BalanceCard
               availableBalance={budget?.availableBalance ?? 0}

@@ -122,8 +122,8 @@ export function useVaultDeposit() {
       return result.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [VAULT_KEY] });
-      queryClient.invalidateQueries({ queryKey: ['budget'] });
+      void queryClient.refetchQueries({ queryKey: [VAULT_KEY] });
+      void queryClient.invalidateQueries({ queryKey: ['budget'] });
       toast({ title: 'Deposited to vault', variant: 'success' });
     },
     onError: (error: Error) => {
@@ -162,8 +162,8 @@ export function useVaultWithdraw() {
       return result.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [VAULT_KEY] });
-      queryClient.invalidateQueries({ queryKey: ['budget'] });
+      void queryClient.refetchQueries({ queryKey: [VAULT_KEY] });
+      void queryClient.invalidateQueries({ queryKey: ['budget'] });
       toast({ title: 'Withdrawn from vault', variant: 'success' });
     },
     onError: (error: Error) => {

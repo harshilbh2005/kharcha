@@ -11,10 +11,12 @@
 //   6. AISummary           — Claude-generated insights
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, addMonths, subMonths, parse } from 'date-fns';
+import { motion, animate } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { useMonthlyAnalytics } from '@/hooks/useMonthlyAnalytics';
 import { useSpendingTrend } from '@/hooks/useSpendingTrend';
 import { CategoryPieChart } from '@/components/analytics/CategoryPieChart';
@@ -84,6 +86,10 @@ function Section({
 }
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
+//
+// Counts up from 0 → amount when scrolled into view.
+// Uses animate() from framer-motion with an onUpdate callback so the displayed
+// value stays a plain React state (no MotionValue children TS issues).
 
 function SummaryCard({
   label,
@@ -94,9 +100,28 @@ function SummaryCard({
   amount: number;
   color: string;
 }) {
+  const [displayed, setDisplayed] = useState(0);
+  const { ref, isVisible } = useScrollReveal();
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (!isVisible || hasAnimated.current) return;
+    hasAnimated.current = true;
+    const controls = animate(0, amount, {
+      duration: 1,
+      ease: 'easeOut',
+      onUpdate: (v) => setDisplayed(Math.round(v)),
+    });
+    return controls.stop;
+  }, [isVisible, amount]);
+
   return (
-    <div
+    <motion.div
+      ref={ref as React.RefObject<HTMLDivElement>}
       className="flex-1 flex flex-col gap-1"
+      initial={{ opacity: 0, y: 8 }}
+      animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+      transition={{ type: 'spring', stiffness: 220, damping: 26 }}
       style={{
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-default)',
@@ -114,9 +139,9 @@ function SummaryCard({
         className="font-mono font-semibold tabular-nums"
         style={{ fontSize: '1.25rem', color }}
       >
-        {formatAmount(amount)}
+        {formatAmount(displayed)}
       </span>
-    </div>
+    </motion.div>
   );
 }
 

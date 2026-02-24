@@ -25,11 +25,13 @@ export interface DepositModalProps {
   onClose: () => void;
   /** Current decrypted vault balance — needed to compute new balance */
   currentBalance: number;
+  /** Called after a successful deposit — triggers coin drop animation */
+  onSuccess?: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function DepositModal({ isOpen, onClose, currentBalance }: DepositModalProps) {
+export function DepositModal({ isOpen, onClose, currentBalance, onSuccess }: DepositModalProps) {
   const [amountStr, setAmountStr] = useState('');
   const [reason, setReason] = useState('');
   const [amountError, setAmountError] = useState('');
@@ -89,6 +91,7 @@ export function DepositModal({ isOpen, onClose, currentBalance }: DepositModalPr
         },
       });
 
+      onSuccess?.();
       onClose();
     } catch {
       // Hook's onError handles toast

@@ -71,7 +71,7 @@ export function BalanceCard({
         : 'var(--color-expense)';   // Terracotta — high spend
 
   return (
-    <Card animated delay={delay}>
+    <Card animated delay={delay} className="balance-card-glow">
       {/* ── Label ──────────────────────────────────────────────────────────── */}
       <p
         className="font-body text-sm leading-none mb-1"

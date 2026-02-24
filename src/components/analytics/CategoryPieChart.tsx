@@ -3,8 +3,9 @@
 // ============================================================
 // KHARCHA — CategoryPieChart
 // Animated donut pie chart showing category spending breakdown.
-// Segments grow outward from center via Framer Motion scale.
-// Tapping a segment reveals a detail card with amount + count.
+// • Scroll reveal: pie grows from centre only once in viewport.
+// • activeShape: tapped segment pops outward (+10px radius).
+// • Detail card fades in below with name, %, amount.
 // ============================================================
 
 import { useState } from 'react';
@@ -13,11 +14,13 @@ import {
   PieChart,
   Pie,
   Cell,
+  Sector,
   ResponsiveContainer,
   Tooltip,
   type TooltipContentProps,
   type PieLabelRenderProps,
 } from 'recharts';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 import type { CategoryBreakdown } from '@/hooks/useMonthlyAnalytics';
 
 // ── Chart colors (design-system hex values — CSS vars don't work in SVG fills) ─
@@ -43,6 +46,24 @@ function formatINR(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(amount));
+}
+
+// ── Active shape — segment pops outward by 10px on tap ───────────────────────
+
+function renderActiveShape(props: unknown) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props as any;
+  return (
+    <Sector
+      cx={cx}
+      cy={cy}
+      innerRadius={innerRadius}
+      outerRadius={outerRadius + 10}
+      startAngle={startAngle}
+      endAngle={endAngle}
+      fill={fill}
+    />
+  );
 }
 
 // ── Custom label rendered outside each segment ──────────────────────────────
@@ -113,7 +134,11 @@ export interface CategoryPieChartProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CategoryPieChart({ data }: CategoryPieChartProps) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  // selectedIndex: which segment is tapped (null = none)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  // Scroll-reveal: animation only fires once when chart enters viewport
+  const { ref, isVisible } = useScrollReveal();
 
   if (data.length === 0) {
     return (
@@ -126,14 +151,14 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
     );
   }
 
-  const activeItem = activeIndex !== null ? data[activeIndex] : null;
+  const activeItem = selectedIndex !== null ? data[selectedIndex] : null;
 
   return (
-    <div>
-      {/* ── Pie chart grows from center via scale spring ─────── */}
+    <div ref={ref as React.RefObject<HTMLDivElement>}>
+      {/* ── Pie chart grows from center when visible ─────────── */}
       <motion.div
         initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        animate={isVisible ? { scale: 1, opacity: 1 } : { scale: 0.6, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 180, damping: 22, delay: 0.1 }}
       >
         <ResponsiveContainer width="100%" height={260}>
@@ -147,14 +172,17 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
               paddingAngle={2}
               dataKey="amount"
               nameKey="name"
-              isAnimationActive
+              isAnimationActive={isVisible}
               animationBegin={0}
               animationDuration={700}
               animationEasing="ease-out"
               labelLine={false}
               label={PieLabel}
+              // Recharts activeIndex + activeShape drive the pop-outward effect on tap.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              {...({ activeIndex: selectedIndex ?? undefined, activeShape: renderActiveShape } as any)}
               onClick={(_, index) => {
-                setActiveIndex(activeIndex === index ? null : index);
+                setSelectedIndex(selectedIndex === index ? null : index);
               }}
               style={{ cursor: 'pointer', outline: 'none' }}
             >
@@ -162,7 +190,7 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
                 <Cell
                   key={`cell-${index}`}
                   fill={CHART_COLORS[index % CHART_COLORS.length]}
-                  opacity={activeIndex === null || activeIndex === index ? 1 : 0.35}
+                  opacity={selectedIndex === null || selectedIndex === index ? 1 : 0.35}
                 />
               ))}
             </Pie>
@@ -171,11 +199,11 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
         </ResponsiveContainer>
       </motion.div>
 
-      {/* ── Detail card slides in below ──────────────────────── */}
+      {/* ── Detail card slides in below on segment tap ────────── */}
       <AnimatePresence mode="wait">
-        {activeItem && activeIndex !== null && (
+        {activeItem && selectedIndex !== null && (
           <motion.div
-            key={activeIndex}
+            key={selectedIndex}
             initial={{ opacity: 0, y: 10, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.97 }}
@@ -197,7 +225,7 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
                 width: 10,
                 height: 10,
                 borderRadius: '50%',
-                background: CHART_COLORS[activeIndex % CHART_COLORS.length],
+                background: CHART_COLORS[selectedIndex % CHART_COLORS.length],
                 flexShrink: 0,
               }}
             />
@@ -248,7 +276,7 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
         {data.slice(0, 8).map((item, index) => (
           <button
             key={item.name}
-            onClick={() => setActiveIndex(activeIndex === index ? null : index)}
+            onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -266,7 +294,7 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
                 height: 8,
                 borderRadius: '50%',
                 background: CHART_COLORS[index % CHART_COLORS.length],
-                opacity: activeIndex === null || activeIndex === index ? 1 : 0.4,
+                opacity: selectedIndex === null || selectedIndex === index ? 1 : 0.4,
                 flexShrink: 0,
               }}
             />
@@ -274,10 +302,8 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
               className="font-body"
               style={{
                 fontSize: 12,
-                color: activeIndex === null || activeIndex === index
-                  ? 'var(--text-secondary)'
-                  : 'var(--text-secondary)',
-                opacity: activeIndex === null || activeIndex === index ? 1 : 0.5,
+                color: 'var(--text-secondary)',
+                opacity: selectedIndex === null || selectedIndex === index ? 1 : 0.5,
               }}
             >
               {item.name.length > 12 ? item.name.slice(0, 11) + '…' : item.name}

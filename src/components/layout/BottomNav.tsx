@@ -17,7 +17,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   Shield,
-  Settings,
+  BarChart2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,8 +36,8 @@ const LEFT_TABS: TabDef[] = [
 ];
 
 const RIGHT_TABS: TabDef[] = [
-  { icon: Shield,   label: "Vault",    path: "/vault"    },
-  { icon: Settings, label: "Settings", path: "/settings" },
+  { icon: Shield,    label: "Vault",     path: "/vault"     },
+  { icon: BarChart2, label: "Analytics", path: "/analytics" },
 ];
 
 // ─── Active-path helper ────────────────────────────────────────────────────────

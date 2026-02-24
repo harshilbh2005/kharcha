@@ -3,10 +3,12 @@
 // ============================================================
 // KHARCHA — SpendingTrendLine
 // Line chart showing monthly spend over the last 6 months.
-// Recharts draws the line from left to right natively.
-// Current month dot is enlarged + accented.
+// • Scroll reveal: line draws itself only when in viewport.
+// • animationDuration=1500 — deliberate left-to-right draw.
+// • After line finishes: dots pop in via animated SVG r attr.
 // ============================================================
 
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   LineChart,
@@ -20,6 +22,7 @@ import {
   type DotProps,
   type TooltipContentProps,
 } from 'recharts';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 import type { TrendMonth } from '@/hooks/useSpendingTrend';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,28 +42,54 @@ function fullINR(amount: number): string {
   }).format(Math.round(amount));
 }
 
-// ── Custom dot (larger + filled for current month) ────────────────────────────
+// ── Animated dot — pops in via SVG r attribute spring ─────────────────────────
+//
+// Uses motion.circle animating the SVG `r` attribute (not CSS transform) so
+// it works without transform-origin issues in SVG coordinate space.
+// Delay = index * 100ms — each dot appears sequentially after line draw.
 
-interface CustomDotProps extends DotProps {
+interface AnimatedDotProps extends DotProps {
   payload?: TrendMonth;
+  dotsVisible: boolean;
+  /** Recharts passes index but it's not in DotProps typings */
+  index?: number;
 }
 
-function CustomDot(props: CustomDotProps) {
-  const { cx, cy, payload } = props;
-  if (cx == null || cy == null) return null;
+// Uses motion.g translated to (cx, cy) + scale 0→1 so transform-origin is always
+// the dot centre — avoids SVG `r` attribute animation TypeScript issues.
+function AnimatedDot(props: AnimatedDotProps) {
+  const { cx, cy, payload, index = 0, dotsVisible } = props;
+  if (cx == null || cy == null || !dotsVisible) return null;
+
+  const delay = index * 0.1;
 
   if (payload?.isCurrentMonth) {
     return (
-      <g>
+      <motion.g
+        transform={`translate(${cx}, ${cy})`}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay, duration: 0.45, ease: 'easeOut' as const }}
+        style={{ transformOrigin: '0 0' }}
+      >
         {/* Outer pulse ring */}
-        <circle cx={cx} cy={cy} r={9} fill="#A37B6F" opacity={0.18} />
+        <circle r={9} fill="#A37B6F" fillOpacity={0.18} />
         {/* Inner filled dot */}
-        <circle cx={cx} cy={cy} r={5} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={2} />
-      </g>
+        <circle r={5} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={2} />
+      </motion.g>
     );
   }
+
   return (
-    <circle cx={cx} cy={cy} r={3} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={1.5} />
+    <motion.g
+      transform={`translate(${cx}, ${cy})`}
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 22, delay }}
+      style={{ transformOrigin: '0 0' }}
+    >
+      <circle r={3} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={1.5} />
+    </motion.g>
   );
 }
 
@@ -134,6 +163,20 @@ export interface SpendingTrendLineProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
+  // After line finishes drawing (onAnimationEnd), dots pop in sequentially
+  const [dotsVisible, setDotsVisible] = useState(false);
+
+  // Scroll reveal — animation only starts when chart is in viewport
+  const { ref, isVisible } = useScrollReveal();
+
+  // Stable dot renderer closes over dotsVisible; recreated only when it changes.
+  // `any` cast because Recharts DotType doesn't align with DotProps exactly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderDot = useCallback(
+    (props: any) => <AnimatedDot {...props} dotsVisible={dotsVisible} />,
+    [dotsVisible],
+  );
+
   if (isLoading) {
     return <TrendSkeleton />;
   }
@@ -156,8 +199,9 @@ export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
 
   return (
     <motion.div
+      ref={ref as React.RefObject<HTMLDivElement>}
       initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
       transition={{ type: 'spring', stiffness: 180, damping: 24, delay: 0.05 }}
     >
       <ResponsiveContainer width="100%" height={190}>
@@ -187,13 +231,15 @@ export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
             dataKey="amount"
             stroke="#A37B6F"
             strokeWidth={2.5}
-            dot={<CustomDot />}
+            dot={renderDot}
             activeDot={{ r: 6, fill: '#A37B6F', stroke: '#F2F0ED', strokeWidth: 2 }}
-            isAnimationActive
-            animationDuration={900}
+            isAnimationActive={isVisible}
+            animationDuration={1500}
             animationEasing="ease-in-out"
+            // Trigger dots pop-in after line finishes drawing
+            onAnimationEnd={() => setDotsVisible(true)}
           />
-          {/* Highlight vertical line for current month */}
+          {/* Label for current month */}
           {currentPoint && (
             <ReferenceDot
               x={currentPoint.label}

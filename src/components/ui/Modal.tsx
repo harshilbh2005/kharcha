@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -130,7 +131,11 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  return (
+  // Mount flag — ensures portal only renders on the client (avoids SSR mismatch)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const sheet = (
     <AnimatePresence>
       {isOpen && (
         <>
@@ -165,34 +170,35 @@ export default function Modal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={title ? titleId : undefined}
-            // tabIndex={-1} lets the panel itself receive programmatic focus
-            // as a fallback when there are no interactive children.
             tabIndex={-1}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={[
-              "fixed bottom-0 left-0 right-0 z-50",
-              "bg-stone-surface",
-              "overflow-y-auto",
-              // outline-none suppresses the focus ring on the panel itself
-              // (we manage focus visually inside the sheet content)
-              "outline-none",
-              fullHeight ? "max-h-[90vh]" : "max-h-[85vh]",
-            ].join(" ")}
+            className="fixed bottom-0 left-0 right-0 z-50 outline-none"
             style={{
-              // Top corners rounded, bottom flush with screen edge
+              backgroundColor: "var(--bg-surface)",
               borderRadius: "var(--radius-xl) var(--radius-xl) 0 0",
-              padding: "var(--space-6)",
-              // Safe area inset pads content above the home indicator on iOS
-              paddingBottom: "calc(var(--space-6) + env(safe-area-inset-bottom))",
+              maxHeight: fullHeight ? "90vh" : "85vh",
+              // fullHeight sheets (like notifications) manage their own
+              // internal scroll — the panel itself is a flex column so
+              // children can use flex:1 to fill remaining space.
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              // Non-fullHeight sheets get uniform padding; fullHeight sheets
+              // let children handle their own edge-to-edge layout.
+              padding: fullHeight ? 0 : "var(--space-6)",
+              paddingBottom: fullHeight
+                ? "env(safe-area-inset-bottom)"
+                : "calc(var(--space-6) + env(safe-area-inset-bottom))",
             }}
           >
             {/* ── Drag handle ───────────────────────────────────────────────── */}
             {showHandle && (
               <div
-                className="w-10 h-1 rounded-full mx-auto mb-4 bg-border-default"
+                className="w-10 h-1 rounded-full mx-auto mt-3 mb-3"
+                style={{ backgroundColor: "var(--border-default)", flexShrink: 0 }}
                 aria-hidden="true"
               />
             )}
@@ -201,7 +207,15 @@ export default function Modal({
             {title && (
               <h2
                 id={titleId}
-                className="font-display text-xl text-ink-primary mb-4"
+                className="font-display text-xl"
+                style={{
+                  color: "var(--text-primary)",
+                  margin: 0,
+                  padding: fullHeight
+                    ? "0 var(--space-5) var(--space-3)"
+                    : "0 0 var(--space-4)",
+                  flexShrink: 0,
+                }}
               >
                 {title}
               </h2>
@@ -214,4 +228,9 @@ export default function Modal({
       )}
     </AnimatePresence>
   );
+
+  // Portal to document.body so position:fixed is always relative to the
+  // viewport, not any ancestor with backdrop-filter / transform / sticky.
+  if (!mounted) return null;
+  return createPortal(sheet, document.body);
 }
