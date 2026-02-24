@@ -13,7 +13,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://img.clerk.com",
-      `connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.clerk.com https://clerk-telemetry.com https://api.exchangerate-api.com https://*.clerk.accounts.dev https://img.clerk.com${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
+      `connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.clerk.com https://clerk-telemetry.com https://api.exchangerate-api.com https://*.clerk.accounts.dev https://img.clerk.com https://challenges.cloudflare.com${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
       "frame-src 'self' https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
