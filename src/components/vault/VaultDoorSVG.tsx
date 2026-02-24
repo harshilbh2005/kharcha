@@ -58,33 +58,33 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
         <radialGradient id="doorBodyGrad" cx="36%" cy="30%" r="70%">
           <stop offset="0%"   stopColor="var(--color-vault-light)" stopOpacity="0.9" />
           <stop offset="55%"  stopColor="var(--color-vault)" />
-          <stop offset="100%" stopColor="#364539" />
+          <stop offset="100%" stopColor="#1E3828" />
         </radialGradient>
 
         {/* ── Outer frame ring: metallic radial ── */}
         <radialGradient id="frameGrad" cx="28%" cy="22%" r="80%">
-          <stop offset="0%"   stopColor="#8EA090" />
+          <stop offset="0%"   stopColor="#5A8A6E" />
           <stop offset="42%"  stopColor="var(--color-vault)" />
-          <stop offset="100%" stopColor="#273029" />
+          <stop offset="100%" stopColor="#162B20" />
         </radialGradient>
 
-        {/* ── Handle arms: linear metallic bronze ── */}
+        {/* ── Handle arms: linear metallic gold ── */}
         <linearGradient id="handleGrad" x1="8%" y1="4%" x2="92%" y2="96%">
-          <stop offset="0%"   stopColor="#D4C5A9" />
+          <stop offset="0%"   stopColor="#D4BE96" />
           <stop offset="28%"  stopColor="var(--color-accent)" />
-          <stop offset="100%" stopColor="#64503C" />
+          <stop offset="100%" stopColor="#5E4A1C" />
         </linearGradient>
 
-        {/* ── Center cap: radial bronze ── */}
+        {/* ── Center cap: radial gold ── */}
         <radialGradient id="capGrad" cx="30%" cy="26%" r="70%">
-          <stop offset="0%"   stopColor="#D4C5A9" />
+          <stop offset="0%"   stopColor="#D4BE96" />
           <stop offset="52%"  stopColor="var(--color-accent)" />
-          <stop offset="100%" stopColor="#64503C" />
+          <stop offset="100%" stopColor="#5E4A1C" />
         </radialGradient>
 
         {/* ── Bolt highlights ── */}
         <radialGradient id="boltGrad" cx="30%" cy="28%" r="68%">
-          <stop offset="0%"   stopColor="#D4C5A9" stopOpacity="0.7" />
+          <stop offset="0%"   stopColor="#D4BE96" stopOpacity="0.7" />
           <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.2" />
         </radialGradient>
       </defs>
@@ -114,13 +114,13 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
         <circle
           cx={cx} cy={cy} r="110"
           fill="none"
-          stroke="#2A3529"
+          stroke="#1A2E1F"
           strokeWidth="2"
           strokeOpacity="0.55"
         />
 
         {/* Frame-to-door shadow step (dark inset annulus) */}
-        <circle cx={cx} cy={cy} r="107" fill="#1F2921" fillOpacity="0.55" />
+        <circle cx={cx} cy={cy} r="107" fill="#0F1A12" fillOpacity="0.55" />
 
         {/* ───────────────────────────────────────────────
             2. DOOR BODY
@@ -135,7 +135,7 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
         <circle
           cx={cx} cy={cy} r="104"
           fill="none"
-          stroke="#1F2921"
+          stroke="#0F1A12"
           strokeWidth="2.5"
           strokeOpacity="0.5"
         />
@@ -181,7 +181,7 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
             {/* Recess shadow */}
             <circle
               cx={b.x + 0.8} cy={b.y + 0.8} r="5.5"
-              fill="#1F2921"
+              fill="#0F1A12"
               fillOpacity="0.4"
             />
             {/* Bolt body */}
@@ -198,7 +198,7 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
             {/* Specular highlight */}
             <circle
               cx={b.x - 1.3} cy={b.y - 1.3} r="1.1"
-              fill="#D4C5A9"
+              fill="#D4BE96"
               fillOpacity="0.62"
             />
           </g>
@@ -214,11 +214,11 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
           {/* Arm drop shadows */}
           <rect
             x="81" y="115.75" width="78" height="10" rx="5"
-            fill="#1F2921" fillOpacity="0.28"
+            fill="#0F1A12" fillOpacity="0.28"
           />
           <rect
             x="115.75" y="81" width="10" height="78" rx="5"
-            fill="#1F2921" fillOpacity="0.28"
+            fill="#0F1A12" fillOpacity="0.28"
           />
 
           {/* Horizontal arm */}
@@ -235,12 +235,12 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
           {/* Top-face specular streak — horizontal */}
           <rect
             x="82" y="115.5" width="76" height="2.25" rx="1.12"
-            fill="#D4C5A9" fillOpacity="0.38"
+            fill="#D4BE96" fillOpacity="0.38"
           />
           {/* Top-face specular streak — vertical */}
           <rect
             x="115.5" y="82" width="2.25" height="76" rx="1.12"
-            fill="#D4C5A9" fillOpacity="0.38"
+            fill="#D4BE96" fillOpacity="0.38"
           />
 
           {/* Center cap — outer bronze ring */}
@@ -249,7 +249,7 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
           <circle
             cx={cx} cy={cy} r="17"
             fill="none"
-            stroke="#D4C5A9"
+            stroke="#D4BE96"
             strokeWidth="0.75"
             strokeOpacity="0.45"
           />
@@ -268,7 +268,7 @@ export function VaultDoorSVG({ size = 220, className }: VaultDoorSVGProps) {
           {/* Center dot specular */}
           <circle
             cx={cx - 1.5} cy={cy - 1.5} r="1.5"
-            fill="#D4C5A9" fillOpacity="0.72"
+            fill="#D4BE96" fillOpacity="0.72"
           />
         </g>
 

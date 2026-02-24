@@ -49,8 +49,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       transition: "border-color 150ms ease, box-shadow 150ms ease",
       ...(focused
         ? {
-            borderColor: "var(--border-input-focus)", // aged bronze #8B7355
-            boxShadow: "0 0 0 3px rgba(139, 115, 85, 0.15)",
+            borderColor: "var(--border-input-focus)", // deep gold #8A7340
+            boxShadow: "0 0 0 3px rgba(138, 115, 64, 0.15)",
           }
         : hasError
           ? {

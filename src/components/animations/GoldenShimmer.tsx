@@ -68,9 +68,9 @@ export function GoldenShimmer({ trigger, children, className = "" }: GoldenShimm
           top: 0,
           width: "200%",
           height: "100%",
-          // Bronze tint: matches --color-accent rgb(139,115,85) @ 12 %
+          // Deep Gold tint: matches --color-accent rgb(138,115,64) @ 12 %
           background:
-            "linear-gradient(90deg, transparent 0%, rgba(139,115,85,0.12) 50%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, rgba(138,115,64,0.12) 50%, transparent 100%)",
           pointerEvents: "none",
           zIndex: 1,
         }}

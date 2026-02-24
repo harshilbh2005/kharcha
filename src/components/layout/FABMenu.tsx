@@ -63,8 +63,8 @@ const FAN_BUTTONS: FanButtonDef[] = [
     label:       'Expense',
     Icon:        ArrowDownLeft,
     iconColor:   'var(--color-expense)',
-    borderColor: 'rgba(163,123,111,0.55)',
-    shadowColor: 'rgba(163,123,111,0.30)',
+    borderColor: 'rgba(150,58,42,0.55)',
+    shadowColor: 'rgba(150,58,42,0.30)',
     x: -68, y: -82, size: 54, iconSize: 22,
   },
   {
@@ -72,8 +72,8 @@ const FAN_BUTTONS: FanButtonDef[] = [
     label:       'Income',
     Icon:        Wallet,
     iconColor:   'var(--color-income)',
-    borderColor: 'rgba(107,125,113,0.55)',
-    shadowColor: 'rgba(107,125,113,0.28)',
+    borderColor: 'rgba(61,107,80,0.55)',
+    shadowColor: 'rgba(61,107,80,0.28)',
     x: 0, y: -110, size: 48, iconSize: 19,
   },
   {
@@ -81,8 +81,8 @@ const FAN_BUTTONS: FanButtonDef[] = [
     label:       'Subscription',
     Icon:        RefreshCw,
     iconColor:   'var(--color-accent)',
-    borderColor: 'rgba(139,115,85,0.55)',
-    shadowColor: 'rgba(139,115,85,0.26)',
+    borderColor: 'rgba(138,115,64,0.55)',
+    shadowColor: 'rgba(138,115,64,0.26)',
     x: 68, y: -82, size: 48, iconSize: 19,
   },
   {
@@ -90,8 +90,8 @@ const FAN_BUTTONS: FanButtonDef[] = [
     label:       'Smart Paste',
     Icon:        Sparkles,
     iconColor:   'var(--color-vault)',
-    borderColor: 'rgba(92,107,94,0.55)',
-    shadowColor: 'rgba(92,107,94,0.26)',
+    borderColor: 'rgba(46,77,58,0.55)',
+    shadowColor: 'rgba(46,77,58,0.26)',
     x: 0, y: -178, size: 44, iconSize: 17,
   },
 ];

@@ -53,7 +53,7 @@ function CustomTooltip({
         border: '1px solid var(--border-default)',
         borderRadius: 8,
         padding: '8px 12px',
-        boxShadow: '0 2px 8px rgba(42,45,52,0.08)',
+        boxShadow: '0 2px 8px rgba(15,14,12,0.08)',
         minWidth: 140,
       }}
     >
@@ -115,15 +115,15 @@ function CustomLegend({
         fontSize: 12,
       }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6B707C' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#5A5750' }}>
         <span
-          style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#A37B6F' }}
+          style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#963A2A' }}
         />
         {currentLabel}
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6B707C' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#5A5750' }}>
         <span
-          style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#D8D4CE' }}
+          style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#E5E1D8' }}
         />
         {previousLabel}
       </span>
@@ -211,17 +211,17 @@ export function MonthComparison({
           barGap={2}
           barCategoryGap="28%"
         >
-          <CartesianGrid strokeDasharray="4 4" stroke="#D8D4CE" vertical={false} />
+          <CartesianGrid strokeDasharray="4 4" stroke="#E5E1D8" vertical={false} />
           <XAxis
             dataKey="category"
-            tick={{ fontSize: 10, fontFamily: 'Inter, sans-serif', fill: '#6B707C' }}
+            tick={{ fontSize: 10, fontFamily: 'Inter, sans-serif', fill: '#5A5750' }}
             axisLine={false}
             tickLine={false}
             dy={4}
           />
           <YAxis
             tickFormatter={shortINR}
-            tick={{ fontSize: 10, fontFamily: 'Inter, sans-serif', fill: '#6B707C' }}
+            tick={{ fontSize: 10, fontFamily: 'Inter, sans-serif', fill: '#5A5750' }}
             axisLine={false}
             tickLine={false}
             width={42}
@@ -230,7 +230,7 @@ export function MonthComparison({
           <Bar
             dataKey="current"
             name={currentLabel}
-            fill="#A37B6F"
+            fill="#963A2A"
             radius={[3, 3, 0, 0]}
             isAnimationActive
             animationDuration={700}
@@ -239,7 +239,7 @@ export function MonthComparison({
           <Bar
             dataKey="previous"
             name={previousLabel}
-            fill="#D8D4CE"
+            fill="#E5E1D8"
             radius={[3, 3, 0, 0]}
             isAnimationActive
             animationDuration={700}

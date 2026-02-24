@@ -73,9 +73,9 @@ function AnimatedDot(props: AnimatedDotProps) {
         style={{ transformOrigin: '0 0' }}
       >
         {/* Outer pulse ring */}
-        <circle r={9} fill="#A37B6F" fillOpacity={0.18} />
+        <circle r={9} fill="#963A2A" fillOpacity={0.18} />
         {/* Inner filled dot */}
-        <circle r={5} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={2} />
+        <circle r={5} fill="#963A2A" stroke="#FAF8F3" strokeWidth={2} />
       </motion.g>
     );
   }
@@ -88,7 +88,7 @@ function AnimatedDot(props: AnimatedDotProps) {
       transition={{ type: 'spring', stiffness: 420, damping: 22, delay }}
       style={{ transformOrigin: '0 0' }}
     >
-      <circle r={3} fill="#A37B6F" stroke="#F2F0ED" strokeWidth={1.5} />
+      <circle r={3} fill="#963A2A" stroke="#FAF8F3" strokeWidth={1.5} />
     </motion.g>
   );
 }
@@ -108,7 +108,7 @@ function CustomTooltip({ active, payload, label }: TooltipContentProps<number, s
         border: '1px solid var(--border-default)',
         borderRadius: 8,
         padding: '8px 12px',
-        boxShadow: '0 2px 8px rgba(42,45,52,0.08)',
+        boxShadow: '0 2px 8px rgba(15,14,12,0.08)',
       }}
     >
       <p
@@ -208,19 +208,19 @@ export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
         <LineChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: -8 }}>
           <CartesianGrid
             strokeDasharray="4 4"
-            stroke="#D8D4CE"
+            stroke="#E5E1D8"
             vertical={false}
           />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fontFamily: 'Inter, sans-serif', fill: '#6B707C' }}
+            tick={{ fontSize: 11, fontFamily: 'Inter, sans-serif', fill: '#5A5750' }}
             axisLine={false}
             tickLine={false}
             dy={6}
           />
           <YAxis
             tickFormatter={shortINR}
-            tick={{ fontSize: 11, fontFamily: 'Inter, sans-serif', fill: '#6B707C' }}
+            tick={{ fontSize: 11, fontFamily: 'Inter, sans-serif', fill: '#5A5750' }}
             axisLine={false}
             tickLine={false}
             width={48}
@@ -229,10 +229,10 @@ export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
           <Line
             type="monotone"
             dataKey="amount"
-            stroke="#A37B6F"
+            stroke="#963A2A"
             strokeWidth={2.5}
             dot={renderDot}
-            activeDot={{ r: 6, fill: '#A37B6F', stroke: '#F2F0ED', strokeWidth: 2 }}
+            activeDot={{ r: 6, fill: '#963A2A', stroke: '#FAF8F3', strokeWidth: 2 }}
             isAnimationActive={isVisible}
             animationDuration={1500}
             animationEasing="ease-in-out"
@@ -249,7 +249,7 @@ export function SpendingTrendLine({ data, isLoading }: SpendingTrendLineProps) {
                 value: 'Today',
                 position: 'top',
                 fontSize: 10,
-                fill: '#8B7355',
+                fill: '#8A7340',
                 fontFamily: 'Inter, sans-serif',
               }}
             />

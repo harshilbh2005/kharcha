@@ -51,8 +51,8 @@ export const metadata: Metadata = {
 // ─── Viewport ───────────────────────────────────────────────────────────────────
 
 export const viewport: Viewport = {
-  // Aged Bronze theme-color keeps the browser chrome on-brand for PWA installs
-  themeColor:    "#8B7355",
+  // Deep Gold theme-color keeps the browser chrome on-brand for PWA installs
+  themeColor:    "#8A7340",
   width:         "device-width",
   initialScale:  1,
   maximumScale:  5,

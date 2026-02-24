@@ -23,16 +23,16 @@ import type { DailySpending } from '@/hooks/useMonthlyAnalytics';
 
 // ── Colour intensity thresholds ───────────────────────────────────────────────
 //   0 spending  → bg-surface   (no heat)
-//   light       → #EDD5CF      (faint terracotta)
-//   medium      → #C49B8D      (muted terracotta)
-//   heavy       → #A37B6F      (full terracotta)
+//   light       → #EDD0CB      (faint cognac)
+//   medium      → #C4725E      (muted cognac)
+//   heavy       → #963A2A      (full cognac red)
 
 function heatColor(amount: number, max: number): string {
   if (amount <= 0 || max === 0) return 'var(--bg-surface)';
   const ratio = Math.min(amount / max, 1);
-  if (ratio < 0.25) return '#EDD5CF';
-  if (ratio < 0.6) return '#C49B8D';
-  return '#A37B6F';
+  if (ratio < 0.25) return '#EDD0CB';
+  if (ratio < 0.6) return '#C4725E';
+  return '#963A2A';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ export function CalendarHeatmap({ data, monthYear }: CalendarHeatmapProps) {
         >
           Less
         </span>
-        {['var(--bg-surface)', '#EDD5CF', '#C49B8D', '#A37B6F'].map((c, i) => (
+        {['var(--bg-surface)', '#EDD0CB', '#C4725E', '#963A2A'].map((c, i) => (
           <div
             key={i}
             style={{

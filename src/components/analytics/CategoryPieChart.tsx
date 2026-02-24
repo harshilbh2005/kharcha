@@ -25,16 +25,16 @@ import type { CategoryBreakdown } from '@/hooks/useMonthlyAnalytics';
 
 // ── Chart colors (design-system hex values — CSS vars don't work in SVG fills) ─
 const CHART_COLORS = [
-  '#A37B6F', // Terracotta  (--color-expense)
-  '#6B7D71', // Sage        (--color-income)
-  '#8B7355', // Bronze      (--color-accent)
-  '#5C6B5E', // Forest      (--color-vault)
-  '#8BA090', // Muted Sage
-  '#C49B8D', // Muted Terracotta
-  '#A6956E', // Muted Bronze
-  '#7B8FA0', // Steel Blue
-  '#9B8BAA', // Muted Purple
-  '#AA9B8B', // Warm Taupe
+  '#963A2A', // Cognac Red  (--color-expense)
+  '#3D6B50', // Hunter Green(--color-income)
+  '#8A7340', // Deep Gold   (--color-accent)
+  '#2E4D3A', // Deep Forest (--color-vault)
+  '#6A9E82', // Muted Hunter
+  '#C4725E', // Muted Cognac
+  '#A69060', // Muted Gold
+  '#5A7A8A', // Steel Teal
+  '#8A7A9A', // Muted Plum
+  '#9A8A7A', // Warm Taupe
 ] as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,10 +89,10 @@ function PieLabel(props: PieLabelRenderProps) {
       fontSize={10}
       fontFamily="Inter, sans-serif"
     >
-      <tspan x={x} dy="-7" fill="#6B707C">
+      <tspan x={x} dy="-7" fill="#5A5750">
         {shortName}
       </tspan>
-      <tspan x={x} dy="14" fill="#2A2D34" fontWeight="700">
+      <tspan x={x} dy="14" fill="#0F0E0C" fontWeight="700">
         {(percent * 100).toFixed(0)}%
       </tspan>
     </text>
