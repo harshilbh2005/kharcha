@@ -101,9 +101,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('[/api/ai/monthly-summary] unexpected error:', error);
-    return NextResponse.json(
-      { error: (error as Error).message || 'Something went wrong' },
-      { status: 500 },
-    );
+
+    // Surface the real Anthropic error to the client for easier debugging
+    const err = error as { status?: number; message?: string; error?: { type?: string; message?: string } };
+    const status  = err.status ?? 500;
+    const message = err.error?.message ?? err.message ?? 'Something went wrong';
+
+    // Map common Anthropic API errors to human-readable messages
+    let clientMessage = message;
+    if (status === 401) clientMessage = 'Invalid Anthropic API key — check ANTHROPIC_API_KEY in Vercel env vars';
+    if (status === 429) clientMessage = 'Anthropic rate limit reached — try again in a moment';
+    if (status === 529) clientMessage = 'Anthropic API overloaded — try again later';
+
+    return NextResponse.json({ error: clientMessage }, { status: status >= 400 && status < 600 ? status : 500 });
   }
 }

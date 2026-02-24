@@ -187,7 +187,8 @@ export async function generateMonthlySummary(
 
     return { ...parsed, raw };
   } catch (error) {
-    console.error('[monthly-summary] Claude API error:', error);
-    return null;
+    // Re-throw so the route handler can return the real error to the client
+    // instead of a generic "AI service unavailable" message.
+    throw error;
   }
 }

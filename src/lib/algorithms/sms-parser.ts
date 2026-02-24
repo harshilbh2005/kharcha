@@ -169,11 +169,46 @@ const SMS_PATTERNS: PatternDef[] = [
     typeGroup: null,
     forceType: 'credit',
   },
+
+  // ── Pattern 12: "Rs.XXX Dr./Cr. from/to A/C XXXXXX1234" (Bank of Baroda) ──
+  //
+  // Matches BOB's abbreviation style used in UPI debit/credit SMS:
+  //   "Rs.10.00 Dr. from A/C XXXXXX5447 and Cr. to 8511613428@axl"
+  //   "Rs.500.00 Cr. to A/C XXXXXX5447 from 8511613428@axl"
+  //
+  // typeGroup captures "Dr." or "Cr." — handled in the type mapping below.
+  {
+    regex: new RegExp(
+      `${AMT}(\\d[\\d,]*\\.?\\d{0,2})\\s+(Dr\\.|Cr\\.)\\s+(?:from|to)\\s+A\\/C\\s+[Xx]*(\\d{4})`,
+      'i',
+    ),
+    amountGroup: 1,
+    typeGroup: 2,
+    accountGroup: 3,
+  },
+
+  // ── Pattern 13: "Cr. to A/C XXXXXX1234" (BOB credit, amount before keyword)
+  //
+  // Handles the reversed form where type comes before amount:
+  //   "Cr. Rs.500.00 to A/C XXXXXX5447"
+  {
+    regex: new RegExp(
+      `(Dr\\.|Cr\\.)\\s+${AMT}(\\d[\\d,]*\\.?\\d{0,2})\\s+(?:from|to)\\s+A\\/C\\s+[Xx]*(\\d{4})`,
+      'i',
+    ),
+    amountGroup: 2,
+    typeGroup: 1,
+    accountGroup: 4,
+  },
 ];
 
 // ─── Merchant extraction from UPI/info fields ─────────────────────────────────
 
 const MERCHANT_PATTERNS: RegExp[] = [
+  // BOB: "Cr. to 8511613428@axl" or "Dr. from 8511613428@axl" — UPI ID after Dr./Cr.
+  /(?:(?:Dr\.|Cr\.)\s+(?:to|from)\s+)([0-9a-zA-Z._-]+@[a-zA-Z]+)/i,
+  // Generic UPI ID anywhere in message (e.g. "to q535514423@ybl")
+  /(?:to\s+)([0-9a-zA-Z._-]+@[a-zA-Z]{2,})/i,
   /(?:to\s+VPA\s+)(.+?)(?:@|\s+UPI|\s*\.?\s*$)/i,
   /(?:UPI[:\s/]+)(.+?)(?:\/|\s+Ref|\s*$)/i,
   /(?:Info:\s*UPI\/)(.+?)(?:\/|\s*$)/i,
@@ -191,6 +226,7 @@ const DATE_PATTERNS: RegExp[] = [
   /(\d{2}[A-Za-z]{3}\d{2,4})/,                 // DDMmmYY (21Feb26)
   /on\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i,      // on 21 February 2026
   /(\d{4}[-\/]\d{2}[-\/]\d{2})/,               // YYYY-MM-DD (ISO, some GPay formats)
+  /\((\d{4}:\d{2}:\d{2})\s+\d{2}:\d{2}:\d{2}\)/, // BOB: (2026:02:24 05:02:11)
 ];
 
 const MONTH_MAP: Record<string, string> = {
@@ -201,6 +237,10 @@ const MONTH_MAP: Record<string, string> = {
 
 /** Normalise a raw date string to YYYY-MM-DD. Returns raw on failure. */
 function normaliseDate(raw: string): string {
+  // YYYY:MM:DD (BOB format — colon-separated)
+  const bob = raw.match(/^(\d{4}):(\d{2}):(\d{2})$/);
+  if (bob) return `${bob[1]}-${bob[2]}-${bob[3]}`;
+
   // YYYY-MM-DD (ISO format — already normalised)
   const iso = raw.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})$/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
@@ -321,8 +361,9 @@ export function parseSMS(smsText: string): ParsedSMS {
     if (pattern.forceType) {
       result.type = pattern.forceType;
     } else if (pattern.typeGroup !== null && match[pattern.typeGroup]) {
-      result.type =
-        match[pattern.typeGroup].toLowerCase() === 'credited' ? 'credit' : 'debit';
+      // Handle both full words ("credited") and BOB abbreviations ("Cr.")
+      const typeStr = match[pattern.typeGroup].toLowerCase();
+      result.type = (typeStr === 'credited' || typeStr === 'cr.') ? 'credit' : 'debit';
     }
 
     if (pattern.accountGroup && match[pattern.accountGroup]) {
@@ -341,7 +382,15 @@ export function parseSMS(smsText: string): ParsedSMS {
     for (const mp of MERCHANT_PATTERNS) {
       const m = text.match(mp);
       if (m?.[1]) {
-        const cleaned = cleanMerchant(m[1]);
+        const candidate = m[1];
+        // Phone-number UPI IDs (e.g. 8511613428@axl): cleanMerchant strips both
+        // the digits AND the @bank suffix leaving nothing. Preserve the full UPI
+        // address so the user can see who they paid.
+        if (/^\d+@[a-zA-Z]+$/.test(candidate)) {
+          result.merchant = candidate;
+          break;
+        }
+        const cleaned = cleanMerchant(candidate);
         if (cleaned.length >= 2) {
           result.merchant = cleaned;
           break;
