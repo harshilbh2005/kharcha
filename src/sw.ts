@@ -37,7 +37,14 @@ const OFFLINE_URL = "/~offline";
 // ── Runtime caching strategies ───────────────────────────────────────────────
 
 const runtimeCaching = [
-  // ── 1. Clerk auth scripts (must be NetworkOnly — auth state must be live) ──
+  // ── 1. Clerk resources — NetworkOnly (auth state + CDN must always be live) ─
+  // img.clerk.com serves OAuth provider icons (Google, etc.) — never cache.
+  // clerk.accounts.dev serves auth scripts — must be fresh for security.
+  // The SW's fetch() goes through connect-src, so both domains are in connect-src.
+  {
+    matcher: /^https:\/\/img\.clerk\.com\//,
+    handler: new NetworkOnly(),
+  },
   {
     matcher: /^https:\/\/.*\.clerk\.accounts\.dev\//,
     handler: new NetworkOnly(),
