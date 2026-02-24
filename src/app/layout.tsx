@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Serif_Display, Inter, IBM_Plex_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import "./globals.css";
 
 // ─── Google Fonts ───────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ export default function RootLayout({
           `}
         >
           <Providers>
+            <ServiceWorkerRegistrar />
             <main>{children}</main>
           </Providers>
         </body>

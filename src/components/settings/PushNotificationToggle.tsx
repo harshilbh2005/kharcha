@@ -117,14 +117,22 @@ export function PushNotificationToggle() {
         body:    JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
       });
 
-      if (!res.ok) throw new Error("Failed to save subscription");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(`API ${res.status}: ${errBody.error ?? "Failed to save subscription"}`);
+      }
 
       setStatus("enabled");
       toast({ title: "Push notifications enabled", variant: "success" });
     } catch (err) {
-      console.error("[PushToggle] enable:", err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[PushToggle] enable:", msg);
       setStatus("disabled");
-      toast({ title: "Could not enable push notifications", variant: "error" });
+      toast({
+        title: "Could not enable push notifications",
+        description: msg,
+        variant: "error",
+      });
     }
   }
 
