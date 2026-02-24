@@ -310,17 +310,19 @@ export function FABMenu() {
           boxShadow: '0 4px 12px rgba(42,45,52,0.08), 0 1px 4px rgba(0,0,0,0.06)',
         }}
         animate={
-          isFanOpen
+          activeModal !== 'none'
+            ? { scale: 0, opacity: 0, y: 0 }
+            : isFanOpen
             ? {
                 y: 0,
-                // Pulse once on open
                 scale: [1, 1.1, 1],
+                opacity: 1,
                 boxShadow: '0 8px 24px rgba(42,45,52,0.20), 0 2px 8px rgba(0,0,0,0.12)',
               }
             : {
                 y: [0, -2, 0],
                 scale: 1,
-                // Shadow grows as button lifts, shrinks as it returns
+                opacity: 1,
                 boxShadow: [
                   '0 4px 12px rgba(42,45,52,0.08), 0 1px 4px rgba(0,0,0,0.06)',
                   '0 8px 20px rgba(42,45,52,0.12), 0 2px 8px rgba(0,0,0,0.08)',
@@ -329,7 +331,9 @@ export function FABMenu() {
               }
         }
         transition={
-          isFanOpen
+          activeModal !== 'none'
+            ? { duration: 0.15, ease: 'easeIn' }
+            : isFanOpen
             ? {
                 scale:     { duration: 0.2, ease: 'easeInOut' },
                 y:         { duration: 0.15 },
@@ -358,6 +362,7 @@ export function FABMenu() {
           alignItems:      'center',
           justifyContent:  'center',
           transition:      'background-color 0.2s ease',
+          pointerEvents:   activeModal !== 'none' ? 'none' : 'auto',
         }}
       >
         {/* "+" rotates to "×" when fan opens */}

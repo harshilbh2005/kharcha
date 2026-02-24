@@ -36,15 +36,31 @@ import { useCategories } from "@/hooks/useCategories";
 import type { ParsedSMS } from "@/types";
 import type { AddExpenseModalPrefill } from "./AddExpenseModal";
 
-// ─── AI stub (Phase 7) ────────────────────────────────────────────────────────
+// ─── AI fallback via /api/ai/parse-sms ───────────────────────────────────────
 
 /**
- * Phase 7: Replace this stub with a real Claude API call.
- * Called when the regex parser returns confidence < 0.5.
+ * Calls POST /api/ai/parse-sms once when regex confidence < 0.5.
+ * The route runs regex again server-side, then calls Claude only if still
+ * below threshold.  Returns null on any network / parse error so the caller
+ * can safely fall through to the error state.
+ *
+ * Loop prevention: called at most once per "Parse" tap (button is disabled
+ * during `uiState === "parsing"`).  The server also rate-limits at 20 req/min.
  */
-async function parseSMSWithAI(_smsText: string): Promise<ParsedSMS | null> {
-  // TODO: POST to /api/ai/parse-sms in Phase 7
-  return null;
+async function parseSMSWithAI(smsText: string): Promise<ParsedSMS | null> {
+  try {
+    const res = await fetch("/api/ai/parse-sms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sms: smsText }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as ParsedSMS & { error?: string };
+    if (data.error || !data.amount) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Merchant → category name hints ──────────────────────────────────────────
@@ -176,21 +192,29 @@ export function SmartPasteInput({
     setUiState("parsing");
     setParsed(null);
 
-    // 1. Regex parser
-    let result = parseSMS(trimmed);
+    // 1. Regex parser — free, instant, no API call
+    const regexResult = parseSMS(trimmed);
 
-    // 2. AI fallback if confidence too low
-    if (result.confidence < 0.5) {
-      const aiResult = await parseSMSWithAI(trimmed);
-      if (aiResult) result = aiResult;
-    }
-
-    if (result.amount <= 0 || result.confidence < 0.5) {
-      setUiState("error");
-    } else {
-      setParsed(result);
+    if (regexResult.confidence >= 0.5) {
+      // Regex succeeded — no AI needed
+      setParsed(regexResult);
       setUiState("parsed");
+      return;
     }
+
+    // 2. AI fallback — called ONCE via server route (regex + Claude).
+    //    The button is disabled while uiState === "parsing" so this cannot
+    //    fire twice.  Server rate-limits at 20 req/min as extra guard.
+    const aiResult = await parseSMSWithAI(trimmed);
+
+    if (aiResult && aiResult.amount > 0) {
+      setParsed(aiResult);
+      setUiState("parsed");
+      return;
+    }
+
+    // 3. Both failed — show error state
+    setUiState("error");
   }, [smsText]);
 
   // ── Confirm & Save ───────────────────────────────────────────────────────────

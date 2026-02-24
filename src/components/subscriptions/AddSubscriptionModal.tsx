@@ -215,7 +215,16 @@ export function AddSubscriptionModal({
       title={isEditing ? 'Edit Subscription' : 'Add Subscription'}
       fullHeight
     >
-      <div className="flex flex-col gap-5">
+      {/*
+        fullHeight modals have padding:0 on the shell so children control layout.
+        This scrollable wrapper adds consistent horizontal padding (matching the
+        Modal title's own 20px inset) and lets the sheet scroll when content
+        overflows on shorter phones.
+      */}
+      <div
+        className="flex flex-col gap-5 overflow-y-auto flex-1"
+        style={{ padding: '4px 20px 20px' }}
+      >
         {/* ── 1. Name ──────────────────────────────────────────────────── */}
         <div>
           <SectionLabel>NAME</SectionLabel>
@@ -309,12 +318,21 @@ export function AddSubscriptionModal({
         </div>
 
         {/* ── 3. Billing day picker (horizontal scroll 1-31) ──────────── */}
+        {/*
+          Bleeds edge-to-edge so the scroll rail spans the full sheet width
+          while the label and content still align with the 20px inset.
+          Negative margin + compensating padding is the standard pattern.
+        */}
         <div>
           <SectionLabel>BILLING DAY</SectionLabel>
           <div
             ref={billingDayRef}
             className="flex gap-1.5 overflow-x-auto pb-1"
             style={{
+              marginLeft: -20,
+              marginRight: -20,
+              paddingLeft: 20,
+              paddingRight: 20,
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
             }}
@@ -503,7 +521,6 @@ export function AddSubscriptionModal({
           type="button"
           onClick={() => {
             onClose();
-            // Small delay so the modal close animation doesn't clash
             setTimeout(() => router.push('/subscriptions'), 150);
           }}
           className="text-center text-sm font-body pt-1 pb-2"
